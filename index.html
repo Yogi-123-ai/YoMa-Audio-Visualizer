@@ -1,0 +1,2361 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YoMa Audio Visualizer</title>
+    <!-- Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome untuk ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Desain Tambahan untuk Background & Transisi */
+        body {
+            background-color: #04060f;
+            /* Latar belakang bersih menggunakan gradien radial halus tanpa gambar */
+            background-image: radial-gradient(circle at top right, rgba(30, 58, 138, 0.2), transparent),
+                              radial-gradient(circle at bottom left, rgba(88, 28, 135, 0.2), transparent);
+            background-size: cover;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }
+        .custom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            transition: background 0.15s ease-in-out;
+        }
+        .custom-slider::-webkit-slider-thumb:hover {
+            background: #60a5fa;
+        }
+        /* Scrollbar kustom untuk panel tema */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.3);
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.5);
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.8);
+        }
+
+        /* Aturan CSS khusus saat kontainer berada dalam mode Fullscreen */
+        #visualizerCard:fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            max-height: none !important;
+            border-radius: 0px !important;
+            background-color: #020308 !important;
+            background-image: radial-gradient(circle at center, rgba(30, 58, 138, 0.15), transparent) !important;
+            padding: 1.5rem !important;
+        }
+        /* Kompatibilitas Safari / Webkit mobile */
+        #visualizerCard:-webkit-full-screen {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            max-height: none !important;
+            border-radius: 0px !important;
+            background-color: #020308 !important;
+            background-image: radial-gradient(circle at center, rgba(30, 58, 138, 0.15), transparent) !important;
+            padding: 1.5rem !important;
+        }
+
+        /* Kelas CSS Fallback untuk Layar Penuh Buatan (Simulated Fullscreen) */
+        .simulated-fullscreen {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            max-height: none !important;
+            border-radius: 0px !important;
+            background-color: #020308 !important;
+            background-image: radial-gradient(circle at center, rgba(30, 58, 138, 0.15), transparent) !important;
+            z-index: 99999 !important;
+            padding: 1.5rem !important;
+        }
+    </style>
+</head>
+<body class="text-gray-100 min-h-screen flex flex-col justify-between font-sans overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="border-b border-gray-900 bg-gray-950/80 backdrop-blur-md sticky top-0 z-50 px-4 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <!-- LOGO UTAMA APLIKASI (YoMa Imgur) -->
+                <div class="relative w-12 h-12 shrink-0 rounded-xl overflow-hidden border border-gray-800 shadow-lg shadow-cyan-500/10">
+                    <img src="https://i.imgur.com/8D7QuXU.png" alt="YoMa Logo" class="w-full h-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1614680376593-902f74fa0d41?w=100&auto=format&fit=crop&q=60'">
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-wider bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+                        YoMa Audio Visualizer
+                    </h1>
+                    <p class="text-xs text-gray-400">Generative Audio Visualizer: Eksplorasi Elemen & Kehidupan Semesta</p>
+                </div>
+            </div>
+            
+            <!-- Sumber Audio & Kontrol Utama -->
+            <div class="flex items-center gap-3">
+                <button id="micBtn" class="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-850 active:bg-black text-sm font-semibold rounded-lg border border-gray-800 transition duration-200">
+                    <i id="micIcon" class="fa-solid fa-microphone text-red-400"></i>
+                    <span id="micText">Aktifkan Mic</span>
+                </button>
+                
+                <label for="audioUpload" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-sm font-semibold rounded-lg shadow-md shadow-blue-500/20 cursor-pointer transition duration-200">
+                    <i class="fa-solid fa-file-audio"></i>
+                    <span>Unggah Audio</span>
+                    <input type="file" id="audioUpload" accept="audio/*" class="hidden">
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <!-- Konten Utama -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 flex flex-col lg:flex-row gap-6 items-stretch justify-center my-4">
+        
+        <!-- Area Visualizer (Kiri/Utama) -->
+        <div id="visualizerCard" class="flex-grow bg-gray-950/40 border border-gray-900 rounded-2xl p-4 flex flex-col justify-between items-center relative overflow-hidden min-h-[500px] lg:min-h-[600px] shadow-2xl">
+            <!-- Overlay Info saat belum ada audio -->
+            <div id="visualizerPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gray-950/95 z-20 transition-opacity duration-300">
+                <!-- LOGO AIR WATERMARK BESAR DI TENGAH PLACEHOLDER -->
+                <div class="w-32 h-32 bg-gray-900/50 border border-gray-800 rounded-2xl flex items-center justify-center mb-6 overflow-hidden shadow-2xl relative group">
+                    <img src="https://i.imgur.com/8D7QuXU.png" alt="YoMa Cover" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" onerror="this.src='https://images.unsplash.com/photo-1614680376593-902f74fa0d41?w=300&auto=format&fit=crop&q=80'">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                </div>
+                <h2 class="text-xl font-bold text-gray-200 mb-2">Masuki Dunia YoMa Visualizer</h2>
+                <p class="text-sm text-gray-400 max-w-md mb-6">Nyalakan mikrofon atau putar musik untuk memicu simulasi realitas matematika dari elemen alam, makhluk hidup, dan energi abstrak.</p>
+                <div class="flex gap-3">
+                    <button onclick="document.getElementById('micBtn').click()" class="px-4 py-2 bg-indigo-600/30 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 rounded-lg text-sm font-medium transition">
+                        Gunakan Mic
+                    </button>
+                    <button onclick="document.getElementById('audioUpload').click()" class="px-4 py-2 bg-blue-600/30 hover:bg-blue-600/40 text-blue-300 border border-blue-500/30 rounded-lg text-sm font-medium transition">
+                        Pilih File Audio
+                    </button>
+                </div>
+            </div>
+
+            <!-- Header Info Audio & Fitur Fullscreen -->
+            <div class="w-full flex justify-between items-center border-b border-gray-900 pb-3 z-10">
+                <div class="flex items-center gap-3">
+                    <span id="sourceIndicator" class="w-2.5 h-2.5 rounded-full bg-gray-600 animate-pulse"></span>
+                    <span id="audioTrackName" class="text-xs text-gray-400 font-medium truncate max-w-[150px] sm:max-w-md">Tidak ada audio aktif</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="text-xs bg-gray-900 px-3 py-1 rounded-full text-cyan-400 border border-cyan-950/50 font-semibold" id="visualizerTypeLabel">
+                        Tema: Pohon Kehidupan (Tumbuhan)
+                    </div>
+                    <!-- Tombol Ganti Tema Cepat (Sangat Berguna saat Fullscreen) -->
+                    <button id="quickThemeBtn" class="bg-gray-900 hover:bg-gray-800 border border-gray-800 w-8 h-8 rounded-full flex items-center justify-center transition" title="Ganti Tema Cepat">
+                        <i class="fa-solid fa-palette text-xs text-gray-400 hover:text-cyan-400"></i>
+                    </button>
+                    <!-- Tombol Fullscreen (Mendukung Desktop & Android) -->
+                    <button id="fullscreenBtn" class="bg-gray-900 hover:bg-gray-800 border border-gray-800 w-8 h-8 rounded-full flex items-center justify-center transition" title="Layar Penuh">
+                        <i id="fullscreenIcon" class="fa-solid fa-expand text-xs text-gray-400 hover:text-cyan-400"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Panel Ganti Tema Cepat (Menggantung Indah, Mendukung Penuh Mode Layar Penuh) -->
+            <div id="quickThemePanel" class="absolute top-16 right-4 bg-gray-950/95 border border-gray-850 p-4 rounded-2xl shadow-2xl z-30 w-72 max-h-[70vh] overflow-y-auto custom-scrollbar hidden transition-all duration-300 backdrop-blur-md">
+                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-cyan-400"></i> Ganti Tema Cepat
+                </h4>
+                <div class="grid grid-cols-2 gap-2 text-[11px]" id="quickThemeGrid">
+                    <button class="quick-style-btn p-2 bg-gray-900 hover:bg-gray-850 rounded-xl flex items-center gap-2 transition text-left text-gray-300 font-medium" data-style="tree">
+                        <i class="fa-solid fa-tree text-emerald-400 text-sm"></i> <span>Pohon</span>
+                    </button>
+                    <button class="quick-style-btn p-2 bg-gray-900 hover:bg-gray-850 rounded-xl flex items-center gap-2 transition text-left text-gray-300 font-medium" data-style="jellyfish">
+                        <i class="fa-solid fa-fish-fins text-cyan-400 text-sm"></i> <span>Ubur-Ubur</span>
+                    </button>
+                    <button class="quick-style-btn p-2 bg-gray-900 hover:bg-gray-850 rounded-xl flex items-center gap-2 transition text-left text-gray-300 font-medium" data-style="human">
+                        <i class="fa-solid fa-brain text-pink-400 text-sm"></i> <span>Pikiran</span>
+                    </button>
+                    <button class="quick-style-btn p-2 bg-gray-900 hover:bg-gray-850 rounded-xl flex items-center gap-2 transition text-left text-gray-300 font-medium" data-style="fire">
+                        <i class="fa-solid fa-fire-flame-curved text-orange-500 text-sm"></i> <span>Api</span>
+                    </button>
+                    <button class="quick-style-btn p-2 bg-gray-900 hover:bg-gray-850 rounded-xl flex items-center gap-2 transition text-left text-gray-300 font-medium" data-style="water">
+                        <i class="fa-solid fa-water text-blue-400 text-sm"></i> <span>Air</span>
+                    </button>
+                    <button class="quick-style-btn p-2 bg-gray-900 hover:bg-gray-850 rounded-xl flex items-center gap-2 transition text-left text-gray-300 font-medium" data-style="wind">
+                        <i class="fa-solid fa-wind text-teal-300 text-sm"></i> <span>Angin</span>
+                    </button>
+                    <button class="quick-style-btn p-2 bg-gray-900 hover:bg-gray-850 rounded-xl flex items-center gap-2 transition text-left text-gray-300 font-medium" data-style="earth">
+                        <i class="fa-solid fa-mountain text-amber-600 text-sm"></i> <span>Tanah</span>
+                    </button>
+                    <button class="quick-style-btn p-2 bg-gray-900 hover:bg-gray-850 rounded-xl flex items-center gap-2 transition text-left text-gray-300 font-medium" data-style="soundwave">
+                        <i class="fa-solid fa-wave-square text-indigo-400 text-sm"></i> <span>Garis 3D</span>
+                    </button>
+                    <button class="quick-style-btn p-2 bg-gray-900 hover:bg-gray-850 rounded-xl flex items-center gap-2 transition text-left text-gray-300 font-medium" data-style="abstract">
+                        <i class="fa-solid fa-bahai text-purple-400 text-sm"></i> <span>Sakral</span>
+                    </button>
+                    <button class="quick-style-btn p-2 bg-gray-900 hover:bg-gray-850 rounded-xl flex items-center gap-2 transition text-left text-gray-300 font-medium" data-style="bars">
+                        <i class="fa-solid fa-chart-simple text-gray-400 text-sm"></i> <span>Klasik</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Canvas Utama Visualizer -->
+            <div class="w-full flex-grow flex items-center justify-center my-2 relative overflow-hidden">
+                <canvas id="visualizerCanvas" class="w-full h-full max-h-[420px] lg:max-h-[500px] rounded-xl"></canvas>
+            </div>
+
+            <!-- Audio Player UI (Hanya muncul jika memutar file) -->
+            <div id="audioPlayerContainer" class="w-full bg-gray-950/90 border border-gray-900 p-4 rounded-xl flex flex-col gap-3 z-10 hidden transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <button id="playPauseBtn" class="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition shadow-md shadow-blue-500/10">
+                            <i id="playIcon" class="fa-solid fa-play"></i>
+                        </button>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-300 truncate max-w-[200px] sm:max-w-xs" id="playerTrackName">Judul Lagu</p>
+                            <p class="text-[10px] text-gray-500" id="audioTimeDisplay">0:00 / 0:00</p>
+                        </div>
+                    </div>
+                    <!-- Volume Kontrol -->
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-volume-high text-xs text-gray-400" id="volumeIcon"></i>
+                        <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.7" class="w-20 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer custom-slider">
+                    </div>
+                </div>
+                <!-- Progress Bar -->
+                <div class="relative w-full h-1.5 bg-gray-855 rounded-full overflow-hidden cursor-pointer" id="progressBarContainer">
+                    <div id="progressBar" class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-indigo-500 w-0 transition-all duration-75"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Kontrol Pengaturan (Kanan) -->
+        <div class="w-full lg:w-96 flex flex-col gap-4 shrink-0">
+            
+            <!-- Pengaturan Gaya Visualizer -->
+            <div class="bg-gray-955/40 border border-gray-900 rounded-2xl p-5 shadow-lg flex flex-col max-h-[620px]">
+                <h3 class="text-sm font-bold text-gray-300 tracking-wider uppercase mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-palette text-blue-500"></i>
+                    Eksplorasi Elemen & Semesta (10 Tema)
+                </h3>
+                
+                <!-- Grid Tema -->
+                <div class="grid grid-cols-2 gap-2 overflow-y-auto pr-1 mb-4 custom-scrollbar max-h-[280px]">
+                    <!-- 1. Tumbuhan -->
+                    <button class="visualizer-style-btn py-2.5 px-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl border border-blue-500/30 flex flex-col items-center text-center gap-1 transition" data-style="tree">
+                        <i class="fa-solid fa-tree text-base text-emerald-400"></i>
+                        <span>Pohon Kehidupan</span>
+                    </button>
+                    <!-- 2. Hewan -->
+                    <button class="visualizer-style-btn py-2.5 px-2 bg-gray-900 hover:bg-gray-855 text-gray-400 text-xs font-semibold rounded-xl border border-gray-900 flex flex-col items-center text-center gap-1 transition" data-style="jellyfish">
+                        <i class="fa-solid fa-fish-fins text-base text-cyan-400"></i>
+                        <span>Ubur-Ubur Laut</span>
+                    </button>
+                    <!-- 3. Manusia -->
+                    <button class="visualizer-style-btn py-2.5 px-2 bg-gray-900 hover:bg-gray-855 text-gray-400 text-xs font-semibold rounded-xl border border-gray-900 flex flex-col items-center text-center gap-1 transition" data-style="human">
+                        <i class="fa-solid fa-brain text-base text-pink-400"></i>
+                        <span>Energi Pikiran</span>
+                    </button>
+                    <!-- 4. Api -->
+                    <button class="visualizer-style-btn py-2.5 px-2 bg-gray-900 hover:bg-gray-855 text-gray-400 text-xs font-semibold rounded-xl border border-gray-900 flex flex-col items-center text-center gap-1 transition" data-style="fire">
+                        <i class="fa-solid fa-fire-flame-curved text-base text-orange-500"></i>
+                        <span>Api Membakar</span>
+                    </button>
+                    <!-- 5. Air -->
+                    <button class="visualizer-style-btn py-2.5 px-2 bg-gray-900 hover:bg-gray-855 text-gray-400 text-xs font-semibold rounded-xl border border-gray-900 flex flex-col items-center text-center gap-1 transition" data-style="water">
+                        <i class="fa-solid fa-water text-base text-blue-400"></i>
+                        <span>Riak Air Danau</span>
+                    </button>
+                    <!-- 6. Angin -->
+                    <button class="visualizer-style-btn py-2.5 px-2 bg-gray-900 hover:bg-gray-855 text-gray-400 text-xs font-semibold rounded-xl border border-gray-900 flex flex-col items-center text-center gap-1 transition" data-style="wind">
+                        <i class="fa-solid fa-wind text-base text-teal-300"></i>
+                        <span>Aliran Angin</span>
+                    </button>
+                    <!-- 7. Tanah (Kompleks & Realistis) -->
+                    <button class="visualizer-style-btn py-2.5 px-2 bg-gray-900 hover:bg-gray-855 text-gray-400 text-xs font-semibold rounded-xl border border-gray-900 flex flex-col items-center text-center gap-1 transition" data-style="earth">
+                        <i class="fa-solid fa-mountain text-base text-amber-600 animate-pulse"></i>
+                        <span>Tanah & Tektonik</span>
+                    </button>
+                    <!-- 8. Gelombang Bunyi -->
+                    <button class="visualizer-style-btn py-2.5 px-2 bg-gray-900 hover:bg-gray-855 text-gray-400 text-xs font-semibold rounded-xl border border-gray-900 flex flex-col items-center text-center gap-1 transition" data-style="soundwave">
+                        <i class="fa-solid fa-wave-square text-base text-indigo-400"></i>
+                        <span>Garis Bunyi 3D</span>
+                    </button>
+                    <!-- 9. Abstrak -->
+                    <button class="visualizer-style-btn py-2.5 px-2 bg-gray-900 hover:bg-gray-855 text-gray-400 text-xs font-semibold rounded-xl border border-gray-900 flex flex-col items-center text-center gap-1 transition" data-style="abstract">
+                        <i class="fa-solid fa-bahai text-base text-purple-400"></i>
+                        <span>Simetri Sakral</span>
+                    </button>
+                    <!-- 10. Klasik -->
+                    <button class="visualizer-style-btn py-2.5 px-2 bg-gray-900 hover:bg-gray-850 text-gray-400 text-xs font-semibold rounded-xl border border-gray-900 flex flex-col items-center text-center gap-1 transition" data-style="bars">
+                        <i class="fa-solid fa-chart-simple text-base text-gray-400"></i>
+                        <span>Batang Klasik</span>
+                    </button>
+                </div>
+
+                <!-- Customizing Slider Parameter -->
+                <div class="space-y-3 pt-3 border-t border-gray-900">
+                    <!-- Pilihan Tema Warna -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 mb-1.5">Skema Warna Cahaya</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button class="theme-color-btn w-6 h-6 rounded-full bg-gradient-to-r from-cyan-400 to-teal-400 border-2 border-white" data-theme="neon-blue" title="Aurora Cyan"></button>
+                            <button class="theme-color-btn w-6 h-6 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 border-2 border-transparent" data-theme="cyberpunk" title="Cyberpunk Orchid"></button>
+                            <button class="theme-color-btn w-6 h-6 rounded-full bg-gradient-to-r from-emerald-500 to-green-400 border-2 border-transparent" data-theme="nature-green" title="Forest Light"></button>
+                            <button class="theme-color-btn w-6 h-6 rounded-full bg-gradient-to-r from-amber-500 to-red-500 border-2 border-transparent" data-theme="fire" title="Sunset Glow"></button>
+                            <!-- 4 Warna Tambahan Baru -->
+                            <button class="theme-color-btn w-6 h-6 rounded-full bg-gradient-to-r from-yellow-600 to-amber-400 border-2 border-transparent" data-theme="retro-gold" title="Retro Gold"></button>
+                            <button class="theme-color-btn w-6 h-6 rounded-full bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 border-2 border-transparent" data-theme="cosmic-nebula" title="Cosmic Nebula"></button>
+                            <button class="theme-color-btn w-6 h-6 rounded-full bg-gradient-to-r from-slate-400 to-slate-200 border-2 border-transparent" data-theme="monochrome-ice" title="Monochrome Ice"></button>
+                            <button class="theme-color-btn w-6 h-6 rounded-full bg-gradient-to-r from-lime-500 to-yellow-300 border-2 border-transparent" data-theme="acid-lemon" title="Acid Lemon"></button>
+                        </div>
+                    </div>
+
+                    <!-- Sensitivitas Kerapatan -->
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold text-gray-400 mb-1">
+                            <span>Kerapatan Detail</span>
+                            <span id="densityVal">64</span>
+                        </div>
+                        <input type="range" id="densitySlider" min="0" max="3" step="1" value="1" class="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer custom-slider">
+                    </div>
+
+                    <!-- KONTROL DINAMIKA (Auto-Gain Strength) -->
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold text-gray-400 mb-1">
+                            <span>Kekuatan Dinamika (Auto-Gain)</span>
+                            <span id="dynamicVal">100%</span>
+                        </div>
+                        <input type="range" id="dynamicSlider" min="0" max="1" step="0.1" value="1" class="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer custom-slider">
+                    </div>
+
+                    <!-- KONTROL KOMPENSASI NADA RENDAH (Bass Equalizer Boost) -->
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold text-gray-400 mb-1">
+                            <span>Kompensasi Nada Rendah (Bass)</span>
+                            <span id="bassVal">1.2x</span>
+                        </div>
+                        <input type="range" id="bassSlider" min="0.2" max="2.5" step="0.1" value="1.2" class="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer custom-slider">
+                    </div>
+
+                    <!-- KONTROL KOMPENSASI TINGGI RENDAH NADA (Treble Equalizer Boost) -->
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold text-gray-400 mb-1">
+                            <span>Kompensasi Nada Tinggi (Treble)</span>
+                            <span id="pitchVal">1.2x</span>
+                        </div>
+                        <input type="range" id="pitchSlider" min="0.2" max="2.5" step="0.1" value="1.2" class="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer custom-slider">
+                    </div>
+                </div>
+            </div>
+
+            <!-- MANAJER PRESET -->
+            <div class="bg-gray-955/40 border border-gray-900 rounded-2xl p-5 shadow-lg flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-sm font-bold text-gray-300 tracking-wider uppercase flex items-center gap-2">
+                        <i class="fa-solid fa-bookmark text-blue-500"></i>
+                        Preset YoMa
+                    </h3>
+                    <button id="openSavePresetBtn" class="text-[10px] bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 border border-blue-500/20 px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1">
+                        <i class="fa-solid fa-plus text-[8px]"></i> Simpan Baru
+                    </button>
+                </div>
+                <!-- Daftar preset yang bisa digulir -->
+                <div id="presetList" class="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                    <!-- Item preset diinjeksikan lewat JS -->
+                </div>
+            </div>
+
+            <!-- Fitur Tambahan & Petunjuk -->
+            <div class="bg-gray-955/40 border border-gray-900 rounded-2xl p-5 shadow-lg flex-grow flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-gray-300 tracking-wider uppercase mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-info text-blue-400"></i>
+                        Karakteristik Sinyal Adaptif
+                    </h3>
+                    <div class="space-y-1.5 text-xs text-gray-400 overflow-y-auto max-h-[110px] pr-1 custom-scrollbar">
+                        <p>🔊 <strong>Dynamic Auto-Gain:</strong> Menyesuaikan sensitivitas real-time pada lagu pelan maupun keras agar visual tetap presisi.</p>
+                        <p>🎼 <strong>Pitch Equalization:</strong> Nada rendah (Bass) dan tinggi (Treble) otomatis mendapatkan boost penguat tambahan yang independen demi visualisasi yang lebih seimbang!</p>
+                    </div>
+                </div>
+
+                <!-- TOMBOL RESET PROYEK KUSTOM (Mulai Baru) -->
+                <div class="mt-4 pt-3 border-t border-gray-900/60">
+                    <button id="resetBtn" class="w-full py-2.5 px-4 bg-red-950/30 hover:bg-red-900/40 text-red-400 hover:text-red-300 border border-red-900/30 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-rotate-left"></i>
+                        Hapus Proyek & Mulai Baru
+                    </button>
+                </div>
+                
+                <div class="pt-3 mt-3 border-t border-gray-900 flex items-center justify-between text-xs text-gray-500">
+                    <span>Versi 3.8.5 (Swipe & Key Switch)</span>
+                    <span class="font-bold text-gray-400">YoMa Studio &copy; 2026</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL KONFIRMASI RESET KUSTOM -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="confirmModalContent" class="bg-gray-950 border border-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-2xl transform scale-95 transition-all duration-300">
+            <h4 class="text-base font-bold text-gray-100 flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+                Hapus & Mulai Baru?
+            </h4>
+            <p class="text-xs text-gray-400 leading-relaxed mb-6">Tindakan ini akan mematikan mikrofon, menghentikan audio yang sedang diputar, dan mengembalikan seluruh setelan slider serta pilihan tema warna ke pengaturan default.</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancelResetBtn" class="px-4 py-2 bg-gray-900 hover:bg-gray-850 text-gray-300 rounded-xl text-xs font-semibold transition duration-150">
+                    Batal
+                </button>
+                <button id="confirmResetBtn" class="px-4 py-2 bg-red-650 hover:bg-red-500 text-white rounded-xl text-xs font-semibold transition duration-150">
+                    Ya, Setel Ulang
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PENYIMPANAN PRESET KUSTOM -->
+    <div id="presetModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="presetModalContent" class="bg-gray-950 border border-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-2xl transform scale-95 transition-all duration-300">
+            <h4 class="text-base font-bold text-gray-100 flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-bookmark text-blue-500"></i>
+                Simpan Preset Baru
+            </h4>
+            <p class="text-xs text-gray-400 mb-4">Simpan konfigurasi tema, warna, kerapatan, dan equalizer saat ini sebagai preset kustom.</p>
+            <input type="text" id="presetNameInput" placeholder="Beri nama preset Anda..." class="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-gray-200 focus:outline-none focus:border-blue-500 mb-6">
+            <div class="flex justify-end gap-3">
+                <button id="cancelPresetBtn" class="px-4 py-2 bg-gray-900 hover:bg-gray-850 text-gray-300 rounded-xl text-xs font-semibold transition">
+                    Batal
+                </button>
+                <button id="confirmSavePresetBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition">
+                    Simpan Preset
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL KONFIRMASI HAPUS PRESET KUSTOM -->
+    <div id="deletePresetModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="deletePresetModalContent" class="bg-gray-950 border border-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-2xl transform scale-95 transition-all duration-300">
+            <h4 class="text-base font-bold text-gray-100 flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-trash-can text-red-500"></i>
+                Hapus Preset Kustom?
+            </h4>
+            <p class="text-xs text-gray-400 leading-relaxed mb-6">Apakah Anda yakin ingin menghapus preset ini? Tindakan ini tidak dapat dibatalkan.</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancelDeletePresetBtn" class="px-4 py-2 bg-gray-900 hover:bg-gray-850 text-gray-300 rounded-xl text-xs font-semibold transition">
+                    Batal
+                </button>
+                <button id="confirmDeletePresetBtn" class="px-4 py-2 bg-red-650 hover:bg-red-500 text-white rounded-xl text-xs font-semibold transition">
+                    Ya, Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL KONFIRMASI HAPUS PRESET KUSTOM -->
+    <div id="deletePresetModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="deletePresetModalContent" class="bg-gray-950 border border-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-2xl transform scale-95 transition-all duration-300">
+            <h4 class="text-base font-bold text-gray-100 flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-trash-can text-red-500"></i>
+                Hapus Preset Kustom?
+            </h4>
+            <p class="text-xs text-gray-400 leading-relaxed mb-6">Apakah Anda yakin ingin menghapus preset ini? Tindakan ini tidak dapat dibatalkan.</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancelDeletePresetBtn" class="px-4 py-2 bg-gray-900 hover:bg-gray-850 text-gray-300 rounded-xl text-xs font-semibold transition">
+                    Batal
+                </button>
+                <button id="confirmDeletePresetBtn" class="px-4 py-2 bg-red-650 hover:bg-red-500 text-white rounded-xl text-xs font-semibold transition">
+                    Ya, Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL KONFIRMASI HAPUS PRESET KUSTOM -->
+    <div id="deletePresetModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[150] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="deletePresetModalContent" class="bg-gray-950 border border-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-2xl transform scale-95 transition-all duration-300">
+            <h4 class="text-base font-bold text-gray-100 flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-trash-can text-red-500"></i>
+                Hapus Preset Kustom?
+            </h4>
+            <p class="text-xs text-gray-400 leading-relaxed mb-6">Apakah Anda yakin ingin menghapus preset ini? Tindakan ini tidak dapat dibatalkan.</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancelDeletePresetBtn" class="px-4 py-2 bg-gray-900 hover:bg-gray-850 text-gray-300 rounded-xl text-xs font-semibold transition">
+                    Batal
+                </button>
+                <button id="confirmDeletePresetBtn" class="px-4 py-2 bg-red-650 hover:bg-red-500 text-white rounded-xl text-xs font-semibold transition">
+                    Ya, Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Status -->
+    <footer class="bg-gray-950/80 border-t border-gray-950 py-3 text-center text-xs text-gray-600">
+        Didukung oleh Web Audio API & Sistem Partikel Fisika Real-Time
+    </footer>
+
+    <!-- Pesan Peringatan Custom (Menggantikan alert) -->
+    <div id="alertBox" class="fixed bottom-6 right-6 max-w-sm w-full bg-red-950/90 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl shadow-2xl z-[100] transition-all duration-300 transform translate-y-20 opacity-0 pointer-events-none">
+        <div class="flex items-start gap-3">
+            <i class="fa-solid fa-triangle-exclamation text-lg text-red-400 mt-0.5"></i>
+            <div>
+                <h4 class="font-bold text-sm">Kesalahan Terjadi</h4>
+                <p id="alertMsg" class="text-xs text-red-300/90 mt-1">Pesan kesalahan di sini.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT UTAMA LOGIK APLIKASI -->
+    <script>
+        // --- INISIALISASI & GLOBAL STATE ---
+        const canvas = document.getElementById('visualizerCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let source;
+        let animationId;
+        
+        let audioElement = new Audio();
+        let isPlayingFile = false;
+        let isMicActive = false;
+        let stream; // mikrofon stream
+        let systemTime = 0; // Untuk animasi berkesinambungan waktu
+
+        // Melacak volume rata-rata secara mulus untuk Auto-Gain Control (Dinamika)
+        let rollingAverageVolume = 40; // Default awal yang aman
+
+        // Map Nilai Kerapatan (Wajib bilangan pangkat 2!)
+        const DENSITY_PRESETS = [32, 64, 128, 256];
+        let densityValue = 64; // Default awal
+
+        // Daftar Urutan Style Visualizer untuk navigasi tombol arah
+        const STYLES_ARRAY = ['tree', 'jellyfish', 'human', 'fire', 'water', 'wind', 'earth', 'soundwave', 'abstract', 'bars'];
+
+        // Daftar Urutan Warna Cahaya Visualizer untuk navigasi arah vertikal (UP/DOWN)
+        const THEMES_ARRAY = ['neon-blue', 'cyberpunk', 'nature-green', 'fire', 'retro-gold', 'cosmic-nebula', 'monochrome-ice', 'acid-lemon'];
+
+        // Konfigurasi Sinyal Adaptif Baru
+        let dynamicStrength = 1.0; // Rentang 0 - 1 (Auto-gain strength)
+        let bassBoost = 1.2;       // Rentang 0.2 - 2.5 (Bass boost factor)
+        let pitchBoost = 1.2;      // Rentang 0.2 - 2.5 (Treble boost factor)
+
+        // Konfigurasi Visualizer Default
+        let visualizerStyle = 'tree'; // 10 gaya total
+        let themeColor = 'neon-blue'; // neon-blue, cyberpunk, nature-green, fire, retro-gold, cosmic-nebula, monochrome-ice, acid-lemon
+
+        // Status Layar Penuh Buatan (Simulated Fullscreen)
+        let isSimulatedFullscreen = false;
+
+        // --- SISTEM PENYIMPANAN PRESET (STATE BARU) ---
+        let presets = [
+            {
+                id: 'default-sakura',
+                name: '🌸 Sakura Bersemi',
+                style: 'tree',
+                theme: 'cyberpunk',
+                densityIdx: 1, // 64
+                dynamic: 1.0,
+                bass: 1.3,
+                pitch: 1.6,
+                isDefault: true
+            },
+            {
+                id: 'default-volcano',
+                name: '🔥 Gunung Berapi',
+                style: 'fire',
+                theme: 'fire',
+                densityIdx: 2, // 128
+                dynamic: 0.8,
+                bass: 1.8,
+                pitch: 0.8,
+                isDefault: true
+            },
+            {
+                id: 'default-deepsea',
+                name: '🪼 Kedalaman Samudra',
+                style: 'jellyfish',
+                theme: 'neon-blue',
+                densityIdx: 1, // 64
+                dynamic: 1.0,
+                bass: 1.5,
+                pitch: 1.1,
+                isDefault: true
+            },
+            {
+                id: 'default-acid',
+                name: '🌀 Badai Lemon',
+                style: 'wind',
+                theme: 'acid-lemon',
+                densityIdx: 2, // 128
+                dynamic: 1.0,
+                bass: 1.0,
+                pitch: 1.8,
+                isDefault: true
+            }
+        ];
+
+        // Menyimpan ID preset yang akan dihapus sementara waktu
+        let presetIdToDelete = null;
+
+        // Setup Responsive Canvas
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // inisialisasi ukuran pertama kali
+
+        // --- MANAJEMEN UI & TOMBOL ---
+        const micBtn = document.getElementById('micBtn');
+        const micIcon = document.getElementById('micIcon');
+        const micText = document.getElementById('micText');
+        const audioUpload = document.getElementById('audioUpload');
+        const visualizerPlaceholder = document.getElementById('visualizerPlaceholder');
+        const sourceIndicator = document.getElementById('sourceIndicator');
+        const audioTrackName = document.getElementById('audioTrackName');
+        const visualizerTypeLabel = document.getElementById('visualizerTypeLabel');
+        
+        const audioPlayerContainer = document.getElementById('audioPlayerContainer');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playIcon = document.getElementById('playIcon');
+        const playerTrackName = document.getElementById('playerTrackName');
+        const audioTimeDisplay = document.getElementById('audioTimeDisplay');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const progressBar = document.getElementById('progressBar');
+        const progressBarContainer = document.getElementById('progressBarContainer');
+
+        const densitySlider = document.getElementById('densitySlider');
+        const densityVal = document.getElementById('densityVal');
+        const dynamicSlider = document.getElementById('dynamicSlider');
+        const dynamicVal = document.getElementById('dynamicVal');
+        const bassSlider = document.getElementById('bassSlider');
+        const bassVal = document.getElementById('bassVal');
+        const pitchSlider = document.getElementById('pitchSlider');
+        const pitchVal = document.getElementById('pitchVal');
+
+        // Elemen Fullscreen
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const fullscreenIcon = document.getElementById('fullscreenIcon');
+        const visualizerCard = document.getElementById('visualizerCard');
+
+        // Elemen Modal Reset Kustom
+        const resetBtn = document.getElementById('resetBtn');
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmModalContent = document.getElementById('confirmModalContent');
+        const cancelResetBtn = document.getElementById('cancelResetBtn');
+        const confirmResetBtn = document.getElementById('confirmResetBtn');
+
+        // Elemen Preset
+        const openSavePresetBtn = document.getElementById('openSavePresetBtn');
+        const presetModal = document.getElementById('presetModal');
+        const presetModalContent = document.getElementById('presetModalContent');
+        const cancelPresetBtn = document.getElementById('cancelPresetBtn');
+        const confirmSavePresetBtn = document.getElementById('confirmSavePresetBtn');
+        const presetNameInput = document.getElementById('presetNameInput');
+        const presetList = document.getElementById('presetList');
+
+        // Elemen Modal Hapus Preset Kustom
+        const deletePresetModal = document.getElementById('deletePresetModal');
+        const deletePresetModalContent = document.getElementById('deletePresetModalContent');
+        const cancelDeletePresetBtn = document.getElementById('cancelDeletePresetBtn');
+        const confirmDeletePresetBtn = document.getElementById('confirmDeletePresetBtn');
+
+        // Elemen Quick Theme Fullscreen
+        const quickThemeBtn = document.getElementById('quickThemeBtn');
+        const quickThemePanel = document.getElementById('quickThemePanel');
+        const quickStyleButtons = document.querySelectorAll('.quick-style-btn');
+
+        // Custom alert helper
+        function showCustomAlert(message) {
+            const alertBox = document.getElementById('alertBox');
+            const alertMsg = document.getElementById('alertMsg');
+            alertMsg.textContent = message;
+            alertBox.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                alertBox.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+            }, 4000);
+        }
+
+        // --- AUDIO ENGINE: SETUP WEB AUDIO API ---
+        function initAudioEngine() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            if (!analyser) {
+                analyser = audioContext.createAnalyser();
+                // fftSize dijamin pangkat 2 (densityValue * 4) karena densityValue dipetakan dari preset pangkat 2.
+                analyser.fftSize = densityValue * 4;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+            }
+        }
+
+        // --- SISTEM VISUALISASI ---
+        function startVisualizerLoop() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            draw();
+        }
+
+        // Ambil warna gradient berdasarkan tema
+        function getThemeGradient(ctx, height, startY = 0) {
+            let grad = ctx.createLinearGradient(0, height, 0, startY);
+            if (themeColor === 'neon-blue') {
+                grad.addColorStop(0, '#0ea5e9'); // cyan
+                grad.addColorStop(0.5, '#2563eb'); // blue
+                grad.addColorStop(1, '#a5f3fc'); // light cyan
+            } else if (themeColor === 'cyberpunk') {
+                grad.addColorStop(0, '#ec4899'); // pink
+                grad.addColorStop(0.5, '#8b5cf6'); // violet
+                grad.addColorStop(1, '#fbcfe8'); // soft pink
+            } else if (themeColor === 'nature-green') {
+                grad.addColorStop(0, '#10b981'); // emerald
+                grad.addColorStop(0.5, '#059669'); // green
+                grad.addColorStop(1, '#a7f3d0'); // light mint
+            } else if (themeColor === 'fire') {
+                grad.addColorStop(0, '#f97316'); // orange
+                grad.addColorStop(0.5, '#dc2626'); // red
+                grad.addColorStop(1, '#fde047'); // yellow
+            } else if (themeColor === 'retro-gold') {
+                grad.addColorStop(0, '#b45309'); // amber-700
+                grad.addColorStop(0.5, '#f59e0b'); // amber-500
+                grad.addColorStop(1, '#fef08a'); // yellow-200
+            } else if (themeColor === 'cosmic-nebula') {
+                grad.addColorStop(0, '#4f46e5'); // indigo-600
+                grad.addColorStop(0.5, '#9333ea'); // purple-600
+                grad.addColorStop(1, '#ec4899'); // pink-500
+            } else if (themeColor === 'monochrome-ice') {
+                grad.addColorStop(0, '#475569'); // slate-600
+                grad.addColorStop(0.5, '#94a3b8'); // slate-400
+                grad.addColorStop(1, '#f1f5f9'); // slate-100
+            } else if (themeColor === 'acid-lemon') {
+                grad.addColorStop(0, '#4d7c0f'); // lime-700
+                grad.addColorStop(0.5, '#84cc16'); // lime-500
+                grad.addColorStop(1, '#fef08a'); // yellow-200
+            }
+            return grad;
+        }
+
+        // Ambil kode warna tunggal (hex/rgba) sesuai tema aktif
+        function getThemeColor(opacity = 1) {
+            if (themeColor === 'neon-blue') return `rgba(14, 165, 233, ${opacity})`;
+            if (themeColor === 'cyberpunk') return `rgba(236, 72, 153, ${opacity})`;
+            if (themeColor === 'nature-green') return `rgba(16, 185, 129, ${opacity})`;
+            if (themeColor === 'fire') return `rgba(249, 115, 22, ${opacity})`;
+            if (themeColor === 'retro-gold') return `rgba(245, 158, 11, ${opacity})`;
+            if (themeColor === 'cosmic-nebula') return `rgba(147, 51, 234, ${opacity})`;
+            if (themeColor === 'monochrome-ice') return `rgba(148, 163, 184, ${opacity})`;
+            if (themeColor === 'acid-lemon') return `rgba(132, 204, 22, ${opacity})`;
+            return `rgba(255, 255, 255, ${opacity})`;
+        }
+
+        // --- INISIALISASI STRUKTUR PARTIKEL KUSTOM ELEMEN ---
+        let particles = [];
+        let ripples = [];
+
+        // Inisialisasi awal partikel
+        function initParticles(count = 80) {
+            particles = [];
+            for (let i = 0; i < count; i++) {
+                const life = Math.random() * 100;
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 1.5,
+                    vy: -Math.random() * 2 - 0.5,
+                    alpha: Math.random() * 0.8 + 0.2,
+                    size: Math.random() * 4 + 1,
+                    life: life,
+                    maxLife: life, // Perbaikan: properti ini ditambahkan untuk menghindari pembagian NaN / nilai tidak terdefinisi
+                    color: Math.random() > 0.5 ? '#ffffff' : getThemeColor(1)
+                });
+            }
+        }
+        initParticles();
+
+        // Menggambar Pohon Fraktal Rekursif (Tema Tumbuhan)
+        function drawTree(x, y, length, angle, depth, bassEnergy, trebleEnergy) {
+            if (depth === 0) {
+                ctx.beginPath();
+                const leafRadius = Math.max(2.5, 2.5 + (trebleEnergy * 0.12));
+                ctx.arc(x, y, leafRadius, 0, Math.PI * 2);
+                
+                if (themeColor === 'nature-green') {
+                    ctx.fillStyle = `rgba(52, 211, 153, ${0.7 + Math.random() * 0.3})`;
+                } else if (themeColor === 'cyberpunk') {
+                    ctx.fillStyle = `rgba(244, 114, 182, ${0.7 + Math.random() * 0.3})`;
+                } else if (themeColor === 'neon-blue') {
+                    ctx.fillStyle = `rgba(34, 211, 238, ${0.7 + Math.random() * 0.3})`;
+                } else if (themeColor === 'retro-gold') {
+                    ctx.fillStyle = `rgba(251, 191, 36, ${0.7 + Math.random() * 0.3})`;
+                } else if (themeColor === 'cosmic-nebula') {
+                    ctx.fillStyle = `rgba(217, 70, 239, ${0.7 + Math.random() * 0.3})`;
+                } else if (themeColor === 'monochrome-ice') {
+                    ctx.fillStyle = `rgba(241, 245, 249, ${0.7 + Math.random() * 0.3})`;
+                } else if (themeColor === 'acid-lemon') {
+                    ctx.fillStyle = `rgba(190, 242, 100, ${0.7 + Math.random() * 0.3})`;
+                } else {
+                    ctx.fillStyle = `rgba(251, 191, 36, ${0.7 + Math.random() * 0.3})`;
+                }
+                ctx.fill();
+                return;
+            }
+
+            const x2 = x + Math.cos(angle) * length;
+            const y2 = y + Math.sin(angle) * length;
+
+            ctx.lineWidth = Math.max(1, depth * 1.5 + (bassEnergy * 0.05));
+            ctx.strokeStyle = `rgba(100, 116, 139, ${0.2 + (depth / 10)})`;
+            
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            const sway = Math.sin(systemTime * 0.02 + depth) * 0.05 + (bassEnergy * 0.001);
+            const nextLength = length * (0.75 + (bassEnergy * 0.0005));
+            
+            drawTree(x2, y2, nextLength, angle - 0.35 + sway, depth - 1, bassEnergy, trebleEnergy);
+            drawTree(x2, y2, nextLength, angle + 0.35 + sway, depth - 1, bassEnergy, trebleEnergy);
+        }
+
+        // Menggambar Siluet Kepala Manusia (Tema Pikiran Manusia)
+        function drawHumanSilhouette(ctx, x, y, size) {
+            ctx.beginPath();
+            ctx.moveTo(x - 60 * size, y + 160 * size);
+            ctx.bezierCurveTo(x - 90 * size, y + 70 * size, x - 70 * size, y - 60 * size, x, y - 100 * size);
+            ctx.bezierCurveTo(x + 50 * size, y - 110 * size, x + 80 * size, y - 40 * size, x + 85 * size, y + 10 * size);
+            ctx.lineTo(x + 78 * size, y + 35 * size);
+            ctx.lineTo(x + 98 * size, y + 42 * size);
+            ctx.lineTo(x + 78 * size, y + 54 * size);
+            ctx.lineTo(x + 85 * size, y + 66 * size);
+            ctx.lineTo(x + 75 * size, y + 74 * size);
+            ctx.lineTo(x + 83 * size, y + 84 * size);
+            ctx.lineTo(x + 70 * size, y + 98 * size);
+            ctx.bezierCurveTo(x + 55 * size, y + 115 * size, x + 40 * size, y + 120 * size, x + 35 * size, y + 160 * size);
+            
+            ctx.fillStyle = '#060813';
+            ctx.fill();
+
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = getThemeColor(0.7);
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = getThemeColor(0.8);
+            ctx.stroke();
+            
+            ctx.shadowBlur = 0;
+        }
+
+        // Loop Gambar Utama Canvas (Render 10 Tema dengan Kompensasi Dinamis)
+        function draw() {
+            animationId = requestAnimationFrame(draw);
+            systemTime += 1;
+
+            if (!analyser) return;
+
+            analyser.getByteFrequencyData(dataArray);
+
+            // Bersihkan Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // --- ALGORITMA DINAMIKA & AUTO-GAIN ADAPTIF ---
+            // 1. Hitung volume rata-rata saat ini (raw average)
+            let totalVolumeRaw = 0;
+            for(let i = 0; i < dataArray.length; i++) {
+                totalVolumeRaw += dataArray[i];
+            }
+            const currentVolumeRaw = totalVolumeRaw / dataArray.length;
+
+            // 2. Terapkan smoothing (Exponential Moving Average) agar transisi sensitivitas mulus
+            rollingAverageVolume = (rollingAverageVolume * 0.98) + (currentVolumeRaw * 0.02);
+
+            // 3. Hitung faktor pengali adaptif berdasarkan dinamika lagu (volume)
+            const targetNormalizerVolume = 55; // Target volume ideal
+            const dynamicScaleFactor = Math.min(2.5, Math.max(0.4, targetNormalizerVolume / Math.max(10, rollingAverageVolume)));
+            
+            // Gain adaptif real-time hasil interpolasi slider kekuatan dinamika
+            const baseGain = 1.5;
+            const adaptiveGain = baseGain * (1 + (dynamicScaleFactor - 1) * dynamicStrength);
+
+            // --- ALGORITMA PITCH EQUALIZATION (TINGGI RENDAH NADA) ---
+            // Spektrum frekuensi dibagi rata menjadi 3 segmen: Bass, Mid, Treble.
+            let bassSum = 0;
+            let midSum = 0;
+            let trebleSum = 0;
+            const segmentLen = Math.floor(dataArray.length / 3);
+
+            for(let i = 0; i < segmentLen; i++) {
+                // Bass (indeks rendah): mendapatkan dorongan penguat bass tambahan dari bassBoost slider
+                bassSum += dataArray[i] * (1.0 + 0.4 * bassBoost);
+                midSum += dataArray[i + segmentLen] * (1.0 + 0.1 * pitchBoost);
+                trebleSum += dataArray[i + 2 * segmentLen] * (1.0 + 0.5 * pitchBoost);
+            }
+
+            const bassEnergy = (bassSum / segmentLen) * adaptiveGain;
+            const midEnergy = (midSum / segmentLen) * adaptiveGain;
+            const trebleEnergy = (trebleSum / segmentLen) * adaptiveGain;
+            const averageEnergy = (bassEnergy + midEnergy + trebleEnergy) / 3;
+
+            const visualLength = Math.min(dataArray.length, densityValue);
+
+            // Helper untuk mendapatkan tinggi bar adaptif berdasarkan indeks (tinggi rendah nada)
+            function getAdaptiveBarHeight(index, rawValue) {
+                // Kurva pembobotan frekuensi hibrid:
+                const bassWeight = (1.0 - (index / visualLength)) * 1.5 * bassBoost;
+                const trebleWeight = (index / visualLength) * 1.2 * pitchBoost;
+                const pitchWeight = 1.0 + bassWeight + trebleWeight;
+                
+                let calculatedHeight = rawValue * adaptiveGain * pitchWeight;
+                
+                // Cegah luapan tinggi melebihi batas kanvas
+                if (calculatedHeight > canvas.height * 0.95) {
+                    calculatedHeight = canvas.height * 0.95;
+                }
+                return calculatedHeight;
+            }
+
+            // ==========================================
+            // TEMA 1: POHON KEHIDUPAN (TUMBUHAN)
+            // ==========================================
+            if (visualizerStyle === 'tree') {
+                const startX = canvas.width / 2;
+                const startY = canvas.height - 20;
+                const baseHeight = Math.min(canvas.height * 0.23, 75 + (bassEnergy * 0.25));
+                const maxDepth = Math.max(5, Math.min(8, Math.floor(densityValue / 16)));
+                
+                ctx.beginPath();
+                ctx.ellipse(startX, startY + 5, 80 + (bassEnergy * 0.15), 10, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(30, 41, 59, 0.4)`;
+                ctx.fill();
+
+                drawTree(startX, startY, baseHeight, -Math.PI / 2, maxDepth, bassEnergy, trebleEnergy);
+            }
+            
+            // ==========================================
+            // TEMA 2: UBUR-UBUR LAUT (HEWAN)
+            // ==========================================
+            else if (visualizerStyle === 'jellyfish') {
+                const centerX = canvas.width / 2;
+                const centerY = (canvas.height / 2 - 20) + Math.sin(systemTime * 0.02) * 15;
+                
+                let capWidth = 55 + (bassEnergy * 0.22);
+                let capHeight = 42 + (bassEnergy * 0.12);
+                
+                // Pengaman ekstra nilai numerik agar tidak bernilai NaN / Non-Finite saat kalkulasi Canvas
+                if (isNaN(capWidth) || !isFinite(capWidth) || capWidth <= 5) capWidth = 55;
+                if (isNaN(capHeight) || !isFinite(capHeight) || capHeight <= 0) capHeight = 42;
+
+                // Tentakel
+                const numTentacles = 8;
+                ctx.lineWidth = 2;
+                for (let i = 0; i < numTentacles; i++) {
+                    const offsetPct = (i / (numTentacles - 1)) - 0.5;
+                    const tentacleX = centerX + (offsetPct * capWidth * 1.5);
+                    const tentacleY = centerY + 10;
+
+                    ctx.beginPath();
+                    ctx.moveTo(tentacleX, tentacleY);
+
+                    let currentX = tentacleX;
+                    let currentY = tentacleY;
+                    const segments = 12;
+                    const segmentHeight = 15;
+                    const audioIdx = Math.floor((i / numTentacles) * visualLength);
+                    // Kompensasi frekuensi tinggi pada tentakel paling ujung kanan
+                    const pitchCorrection = 1.0 + (i / numTentacles) * 0.5 * pitchBoost;
+                    const localWaveIntensity = (dataArray[audioIdx] || 0) * adaptiveGain * pitchCorrection;
+
+                    for (let j = 1; j <= segments; j++) {
+                        const targetY = tentacleY + (j * segmentHeight);
+                        const wavePhase = systemTime * 0.05 + (j * 0.4);
+                        const waveOffset = Math.sin(wavePhase) * (10 + (localWaveIntensity * 0.15));
+                        const targetX = tentacleX + waveOffset * (j / segments);
+                        ctx.lineTo(targetX, targetY);
+                        currentX = targetX;
+                        currentY = targetY;
+                    }
+
+                    const tentacleGrad = ctx.createLinearGradient(0, tentacleY, 0, tentacleY + (segments * segmentHeight));
+                    tentacleGrad.addColorStop(0, getThemeColor(0.8));
+                    tentacleGrad.addColorStop(1, getThemeColor(0));
+                    ctx.strokeStyle = tentacleGrad;
+                    ctx.stroke();
+                }
+
+                // Tudung Ubur-Ubur
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = getThemeColor(0.8);
+                const grad = ctx.createRadialGradient(centerX, centerY - 10, 5, centerX, centerY, capWidth);
+                grad.addColorStop(0, getThemeColor(0.95));
+                grad.addColorStop(0.7, getThemeColor(0.4));
+                grad.addColorStop(1, 'rgba(15, 23, 42, 0.1)');
+                ctx.fillStyle = grad;
+                
+                ctx.beginPath();
+                ctx.moveTo(centerX - capWidth, centerY);
+                ctx.bezierCurveTo(centerX - capWidth, centerY - capHeight, centerX + capWidth, centerY - capHeight, centerX + capWidth, centerY);
+                ctx.bezierCurveTo(centerX + capWidth * 0.6, centerY + 10, centerX - capWidth * 0.6, centerY + 10, centerX - capWidth, centerY);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.strokeStyle = `rgba(255, 255, 255, 0.25)`;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // ==========================================
+            // TEMA 3: ENERGI PIKIRAN (MANUSIA)
+            // ==========================================
+            else if (visualizerStyle === 'human') {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const scale = Math.min(canvas.width, canvas.height) / 480;
+                const brainX = centerX - 10 * scale;
+                const brainY = centerY - 15 * scale;
+
+                const numRays = visualLength;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = getThemeColor(0.6);
+
+                for (let i = 0; i < numRays; i++) {
+                    const angle = (i / numRays) * Math.PI * 2;
+                    let value = dataArray[i] * adaptiveGain;
+                    
+                    // Boost kustom hibrid Bass & Treble untuk aura pikiran
+                    const angleWeight = 1.0 + (i / numRays) * 0.5 * pitchBoost + (1.0 - (i / numRays)) * 0.5 * bassBoost;
+                    const minLength = 60 * scale;
+                    const rayLength = minLength + (value * 0.8 * scale * angleWeight);
+                    
+                    const startX = brainX + Math.cos(angle) * (20 * scale);
+                    const startY = brainY + Math.sin(angle) * (20 * scale);
+                    const endX = brainX + Math.cos(angle) * rayLength;
+                    const endY = brainY + Math.sin(angle) * rayLength;
+
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    const ctrlX = brainX + Math.cos(angle + 0.1) * (rayLength * 0.5);
+                    const ctrlY = brainY + Math.sin(angle + 0.1) * (rayLength * 0.5);
+                    ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+
+                    ctx.strokeStyle = getThemeColor(0.15 + (value / 255) * 0.75);
+                    ctx.lineWidth = Math.max(1.5, 3.5 * scale * (value / 255));
+                    ctx.stroke();
+                }
+
+                ctx.shadowBlur = 0;
+                drawHumanSilhouette(ctx, centerX, centerY, scale);
+            }
+
+            // ==========================================
+            // TEMA 4: API MEMBAKAR (ELEMEN API)
+            // ==========================================
+            else if (visualizerStyle === 'fire') {
+                if (particles.length > 150) particles = particles.slice(0, 100);
+                
+                // Tambahkan partikel api baru sebanding dengan hentakan Bass
+                const spawnCount = Math.floor(1 + (bassEnergy * 0.15));
+                for(let k = 0; k < spawnCount; k++) {
+                    particles.push({
+                        x: (canvas.width * 0.15) + Math.random() * (canvas.width * 0.7),
+                        y: canvas.height,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: -Math.random() * (3 + (bassEnergy * 0.15)) - 1.5,
+                        life: Math.random() * 30 + 20,
+                        maxLife: Math.random() * 30 + 20,
+                        size: Math.random() * 15 + 8
+                    });
+                }
+
+                ctx.save();
+                ctx.globalCompositeOperation = 'screen';
+
+                for (let i = 0; i < particles.length; i++) {
+                    const p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+
+                    if (p.life <= 0 || p.x < 0 || p.x > canvas.width) {
+                        particles.splice(i, 1);
+                        i--;
+                        continue;
+                    }
+
+                    const currentMaxLife = p.maxLife || 100;
+                    const pct = p.life / currentMaxLife;
+                    let size = p.size * pct;
+
+                    if (isNaN(size) || !isFinite(size) || size <= 0) {
+                        size = 0.0001;
+                    }
+
+                    let fireGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size);
+                    if (themeColor === 'fire') {
+                        fireGrad.addColorStop(0, `rgba(254, 240, 138, ${pct})`);
+                        fireGrad.addColorStop(0.3, `rgba(249, 115, 22, ${pct * 0.8})`);
+                        fireGrad.addColorStop(0.8, `rgba(239, 68, 68, ${pct * 0.3})`);
+                        fireGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                    } else if (themeColor === 'retro-gold') {
+                        fireGrad.addColorStop(0, `rgba(254, 240, 138, ${pct})`); // Inti kuning cerah
+                        fireGrad.addColorStop(0.4, `rgba(217, 119, 6, ${pct * 0.8})`); // Amber
+                        fireGrad.addColorStop(0.8, `rgba(146, 64, 14, ${pct * 0.3})`); // Oranye tua
+                        fireGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                    } else {
+                        let r = 14, g = 165, b = 233;
+                        if (themeColor === 'cyberpunk') { r = 236; g = 72; b = 153; }
+                        else if (themeColor === 'nature-green') { r = 16; g = 185; b = 129; }
+                        else if (themeColor === 'cosmic-nebula') { r = 168; g = 85; b = 247; }
+                        else if (themeColor === 'monochrome-ice') { r = 148; g = 163; b = 184; }
+                        else if (themeColor === 'acid-lemon') { r = 132; g = 204; b = 22; }
+                        
+                        fireGrad.addColorStop(0, `rgba(255, 255, 255, ${pct})`);
+                        fireGrad.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, ${pct * 0.8})`);
+                        fireGrad.addColorStop(0.9, `rgba(${Math.max(0, r - 50)}, ${Math.max(0, g - 50)}, ${Math.min(255, b + 20)}, ${pct * 0.2})`);
+                        fireGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                    }
+
+                    ctx.fillStyle = fireGrad;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                const lavaHeight = 10 + (bassEnergy * 0.15);
+                const baseGrad = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - lavaHeight);
+                baseGrad.addColorStop(0, getThemeColor(1));
+                baseGrad.addColorStop(1, getThemeColor(0));
+                ctx.fillStyle = baseGrad;
+                ctx.fillRect(0, canvas.height - lavaHeight, canvas.width, lavaHeight);
+            }
+
+            // ==========================================
+            // TEMA 5: RIAK AIR DANAU (ELEMEN AIR)
+            // ==========================================
+            else if (visualizerStyle === 'water') {
+                ctx.save();
+                
+                const numWaves = 3;
+                for (let w = 0; w < numWaves; w++) {
+                    ctx.beginPath();
+                    const phase = systemTime * 0.04 + w * Math.PI / 3;
+                    const waveHeight = 40 + w * 12 + (bassEnergy * 0.15);
+                    const baseLevel = canvas.height - 80 - w * 15;
+
+                    ctx.moveTo(0, canvas.height);
+                    for (let x = 0; x <= canvas.width; x += 15) {
+                        const offsetIdx = Math.floor((x / canvas.width) * visualLength);
+                        // Sensitivitas air meliuk diatur dinamis menyesuaikan frekuensi tinggi/rendah
+                        const pitchWeight = 1.0 + (offsetIdx / visualLength) * 0.8 * pitchBoost + (1.0 - (offsetIdx / visualLength)) * 0.8 * bassBoost;
+                        const audioVal = (dataArray[offsetIdx] || 0) * 0.25 * adaptiveGain * pitchWeight;
+                        const y = baseLevel + Math.sin(x * 0.006 + phase) * (15 + audioVal);
+                        ctx.lineTo(x, y);
+                    }
+                    ctx.lineTo(canvas.width, canvas.height);
+                    ctx.closePath();
+                    
+                    ctx.fillStyle = getThemeColor(0.2 + (w * 0.15));
+                    ctx.fill();
+                }
+
+                if (bassEnergy > 140 && Math.random() > 0.85) {
+                    ripples.push({
+                        x: canvas.width / 2 + (Math.random() - 0.5) * 120,
+                        y: canvas.height - 180 + (Math.random() - 0.5) * 40,
+                        r: 5,
+                        maxR: Math.random() * 100 + 80,
+                        alpha: 1
+                    });
+                }
+
+                ctx.lineWidth = 1.5;
+                for (let r = 0; r < ripples.length; r++) {
+                    const rip = ripples[r];
+                    rip.r += 2.5;
+                    rip.alpha = 1 - (rip.r / rip.maxR);
+
+                    if (rip.alpha <= 0) {
+                        ripples.splice(r, 1);
+                        r--;
+                        continue;
+                    }
+
+                    ctx.beginPath();
+                    ctx.ellipse(rip.x, rip.y, rip.r, rip.r * 0.35, 0, 0, Math.PI * 2);
+                    ctx.strokeStyle = getThemeColor(rip.alpha * 0.8);
+                    ctx.stroke();
+                }
+
+                const splashProb = Math.floor(bassEnergy * 0.1);
+                if(splashProb > 5) {
+                    for(let s = 0; s < 2; s++) {
+                        particles.push({
+                            x: Math.random() * canvas.width,
+                            y: canvas.height - 120,
+                            vx: (Math.random() - 0.5) * 4,
+                            vy: -Math.random() * (4 + (bassEnergy * 0.12)) - 2,
+                            size: Math.random() * 3 + 2,
+                            life: 40
+                        });
+                    }
+                }
+
+                for (let i = 0; i < particles.length; i++) {
+                    const p = particles[i];
+                    if (p.life !== undefined) {
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.vy += 0.2;
+                        p.life--;
+
+                        if (p.life <= 0 || p.y > canvas.height) {
+                            particles.splice(i, 1);
+                            i--;
+                            continue;
+                        }
+
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        ctx.fillStyle = getThemeColor(0.8);
+                        ctx.fill();
+                    }
+                }
+
+                ctx.restore();
+            }
+
+            // ==========================================
+            // TEMA 6: ALIRAN ANGIN PUYUH (ELEMEN ANGIN)
+            // ==========================================
+            else if (visualizerStyle === 'wind') {
+                ctx.save();
+                
+                ctx.lineWidth = 1;
+                const windLinesCount = 6;
+                for (let l = 0; l < windLinesCount; l++) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = getThemeColor(0.08 + (l * 0.03));
+                    const windPhase = systemTime * 0.015 + l * 5;
+                    const amplitude = 30 + (midEnergy * 0.5);
+
+                    for (let x = 0; x <= canvas.width; x += 10) {
+                        const freqIdx = Math.floor((x / canvas.width) * visualLength);
+                        const pitchWeight = 1.0 + (freqIdx / visualLength) * 0.8 * pitchBoost + (1.0 - (freqIdx / visualLength)) * 0.5 * bassBoost;
+                        const audioVal = (dataArray[freqIdx] || 0) * 0.2 * adaptiveGain * pitchWeight;
+                        const y = (canvas.height * 0.3) + l * 40 + Math.sin(x * 0.004 + windPhase) * amplitude + Math.cos(x * 0.01 - windPhase) * (10 + audioVal);
+                        if (x === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                }
+
+                const spawnRate = Math.floor(trebleEnergy * 0.08);
+                if (spawnRate > 2 && particles.length < 120) {
+                    particles.push({
+                        x: -10,
+                        y: Math.random() * (canvas.height * 0.7) + 50,
+                        size: Math.random() * 5 + 3,
+                        speedX: Math.random() * 3 + 2 + (averageEnergy * 0.02),
+                        wobbleSpeed: Math.random() * 0.05 + 0.02,
+                        wobbleRange: Math.random() * 15 + 10,
+                        angle: Math.random() * Math.PI * 2,
+                        rotSpeed: (Math.random() - 0.5) * 0.05
+                    });
+                }
+
+                for (let i = 0; i < particles.length; i++) {
+                    const p = particles[i];
+                    if (p.speedX !== undefined) {
+                        p.x += p.speedX;
+                        p.angle += p.rotSpeed;
+                        const floatY = Math.sin(p.x * p.wobbleSpeed) * p.wobbleRange;
+
+                        if (p.x > canvas.width + 10) {
+                            particles.splice(i, 1);
+                            i--;
+                            continue;
+                        }
+
+                        ctx.save();
+                        ctx.translate(p.x, p.y + floatY);
+                        ctx.rotate(p.angle);
+                        
+                        ctx.beginPath();
+                        ctx.ellipse(0, 0, p.size * 1.5, p.size * 0.7, 0, 0, Math.PI * 2);
+                        ctx.fillStyle = getThemeColor(0.85);
+                        ctx.fill();
+                        
+                        ctx.restore();
+                    }
+                }
+
+                ctx.restore();
+            }
+
+            // ==========================================
+            // TEMA 7: TANAH & TEKTONIK (ELEMEN TANAH) - DIPERBAIKI & LEBIH REALISTIS
+            // ==========================================
+            else if (visualizerStyle === 'earth') {
+                ctx.save();
+                
+                // 1. Gambar Retakan Seismik di Dasar Layar (Bergetar Hekat mengikuti Bass)
+                ctx.lineWidth = 2.5;
+                ctx.strokeStyle = `rgba(161, 98, 7, ${0.4 + (bassEnergy / 255) * 0.6})`; // Warna coklat tanah berpendar
+                ctx.beginPath();
+                const stepX = canvas.width / 15;
+                ctx.moveTo(0, canvas.height - 15);
+                for (let s = 1; s <= 15; s++) {
+                    const segmentBass = dataArray[s % visualLength] * adaptiveGain * bassBoost * 0.12;
+                    // Pola seismogram bergetar zig-zag di dasar tanah
+                    const randY = (s % 2 === 0 ? 1 : -1) * segmentBass;
+                    ctx.lineTo(s * stepX, canvas.height - 18 + randY);
+                }
+                ctx.stroke();
+
+                // 2. Guguran Batu/Tanah dari Langit-Langit (Particles Landslide)
+                const landslideRate = Math.floor(bassEnergy * 0.08);
+                if (landslideRate > 1 && particles.length < 150) {
+                    particles.push({
+                        x: Math.random() * canvas.width,
+                        y: -10,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: Math.random() * 4 + 2 + (bassEnergy * 0.02),
+                        size: Math.random() * 6 + 3,
+                        angle: Math.random() * Math.PI,
+                        rotSpeed: (Math.random() - 0.5) * 0.1,
+                        isStone: true
+                    });
+                }
+
+                // Render Partikel Batuan Landslide
+                for (let i = 0; i < particles.length; i++) {
+                    const p = particles[i];
+                    if (p.isStone) {
+                        p.y += p.vy;
+                        p.x += p.vx;
+                        p.angle += p.rotSpeed;
+
+                        if (p.y > canvas.height - 15) {
+                            // Partikel hancur/meledak di dasar tanah
+                            particles.splice(i, 1);
+                            i--;
+                            continue;
+                        }
+
+                        ctx.save();
+                        ctx.translate(p.x, p.y);
+                        ctx.rotate(p.angle);
+                        
+                        // Gambar partikel batu tak beraturan (poligon faset)
+                        ctx.beginPath();
+                        ctx.moveTo(0, -p.size);
+                        ctx.lineTo(p.size, -p.size * 0.3);
+                        ctx.lineTo(p.size * 0.6, p.size);
+                        ctx.lineTo(-p.size * 0.6, p.size * 0.8);
+                        ctx.lineTo(-p.size, -p.size * 0.2);
+                        ctx.closePath();
+                        
+                        ctx.fillStyle = getThemeColor(0.65);
+                        ctx.strokeStyle = `rgba(255, 255, 255, 0.25)`;
+                        ctx.lineWidth = 1;
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+
+                // 3. Pegunungan Tektonik (3 Gunung Berbatu Tumbuh Bergetar)
+                const numMountains = 3;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = getThemeColor(0.5);
+
+                for (let m = 0; m < numMountains; m++) {
+                    const mX = canvas.width * 0.25 + (m * (canvas.width * 0.25));
+                    const audioIdx = Math.floor((m / numMountains) * visualLength);
+                    
+                    // Tinggi gunung dikendalikan oleh gain adaptif & pembobotan bass kustom
+                    const mBass = (dataArray[audioIdx] || 0) * 1.1 * adaptiveGain * bassBoost;
+                    const mHeight = Math.max(50, 60 + mBass);
+                    const mWidth = 70 + (m % 2 * 25);
+                    const mY = canvas.height - 18;
+
+                    // Gambar 3D Gunung Tektonik dengan Sisi Terang & Sisi Bayangan
+                    // Sisi Kiri Gunung
+                    ctx.beginPath();
+                    ctx.moveTo(mX - mWidth, mY);
+                    ctx.lineTo(mX, mY - mHeight);
+                    ctx.lineTo(mX, mY);
+                    ctx.closePath();
+                    
+                    const leftGrad = ctx.createLinearGradient(mX - mWidth, mY, mX, mY - mHeight);
+                    leftGrad.addColorStop(0, 'rgba(34, 19, 10, 0.8)'); // Coklat tanah pekat
+                    leftGrad.addColorStop(0.7, getThemeColor(0.8));
+                    leftGrad.addColorStop(1, '#ffffff');
+                    ctx.fillStyle = leftGrad;
+                    ctx.fill();
+
+                    // Sisi Kanan Gunung (Efek Bayangan 3D)
+                    ctx.beginPath();
+                    ctx.moveTo(mX, mY - mHeight);
+                    ctx.lineTo(mX + mWidth, mY);
+                    ctx.lineTo(mX, mY);
+                    ctx.closePath();
+
+                    const rightGrad = ctx.createLinearGradient(mX, mY - mHeight, mX + mWidth, mY);
+                    rightGrad.addColorStop(0, '#ffffff');
+                    rightGrad.addColorStop(0.3, getThemeColor(0.65));
+                    rightGrad.addColorStop(1, 'rgba(15, 10, 5, 0.9)');
+                    ctx.fillStyle = rightGrad;
+                    ctx.fill();
+                }
+
+                ctx.shadowBlur = 0;
+                ctx.restore();
+            }
+
+            // ==========================================
+            // TEMA 8: GARIS BUNYI 3D (SPEKTRUM AURORA)
+            // ==========================================
+            else if (visualizerStyle === 'soundwave') {
+                ctx.save();
+                ctx.lineWidth = 2.5;
+
+                const numRibbons = 4;
+                for (let r = 0; r < numRibbons; r++) {
+                    ctx.beginPath();
+                    
+                    const ribbonGrad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+                    ribbonGrad.addColorStop(0, getThemeColor(0));
+                    ribbonGrad.addColorStop(0.5, getThemeColor(0.5 - (r * 0.1)));
+                    ribbonGrad.addColorStop(1, getThemeColor(0));
+                    ctx.strokeStyle = ribbonGrad;
+
+                    const sliceWidth = canvas.width / visualLength;
+                    let x = 0;
+
+                    for (let i = 0; i < visualLength; i++) {
+                        let value = dataArray[i];
+                        const bassWeight = (1.0 - (i / visualLength)) * 1.5 * bassBoost;
+                        const trebleWeight = (i / visualLength) * 1.3 * pitchBoost;
+                        const pitchWeight = 1.0 + bassWeight + trebleWeight;
+                        
+                        const valueScaled = value * adaptiveGain * pitchWeight;
+
+                        const wavePhase = systemTime * 0.035 - (r * 0.8);
+                        const displacement = Math.sin((i * 0.15) + wavePhase) * (valueScaled * 0.45);
+                        const y = (canvas.height * 0.35) + (r * 35) + displacement;
+
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+
+                        x += sliceWidth;
+                    }
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            // ==========================================
+            // TEMA 9: SIMETRI SAKRAL (ABSTRAK SPEKTRAL)
+            // ==========================================
+            else if (visualizerStyle === 'abstract') {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const maxRadius = Math.min(canvas.width, canvas.height) * 0.38;
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                
+                const rotSpeed = systemTime * 0.003 + (bassEnergy * 0.0002);
+                ctx.rotate(rotSpeed);
+
+                const sides = 12;
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = getThemeColor(0.3);
+
+                ctx.beginPath();
+                for (let i = 0; i < sides; i++) {
+                    const angle = (i / sides) * Math.PI * 2;
+                    const dataIdx = Math.floor((i / sides) * visualLength);
+                    
+                    const bassWeight = (1.0 - (dataIdx / visualLength)) * 1.0 * bassBoost;
+                    const trebleWeight = (dataIdx / visualLength) * 0.8 * pitchBoost;
+                    const pitchWeight = 1.0 + bassWeight + trebleWeight;
+                    
+                    let val = dataArray[dataIdx] * adaptiveGain * pitchWeight;
+                    
+                    const r = maxRadius * 0.4 + (val * 0.35);
+                    const x = Math.cos(angle) * r;
+                    const y = Math.sin(angle) * r;
+
+                    ctx.lineTo(x, y);
+                    ctx.arc(x, y, 3, 0, Math.PI * 2);
+                }
+                ctx.closePath();
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(0, 0, maxRadius * 0.2 + (bassEnergy * 0.1), 0, Math.PI * 2);
+                ctx.strokeStyle = getThemeColor(0.6);
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.beginPath();
+                for (let i = 0; i < visualLength; i++) {
+                    const angle = (i / visualLength) * Math.PI * 2;
+                    let value = dataArray[i];
+                    
+                    const bassWeight = (1.0 - (i / visualLength)) * 1.2 * bassBoost;
+                    const trebleWeight = (i / visualLength) * 1.0 * pitchBoost;
+                    const pitchWeight = 1.0 + bassWeight + trebleWeight;
+                    const valueScaled = value * adaptiveGain * pitchWeight;
+                    
+                    const innerR = maxRadius * 0.35;
+                    const outerR = innerR + Math.max(5, valueScaled * 0.55);
+
+                    const startX = Math.cos(angle) * innerR;
+                    const startY = Math.sin(angle) * innerR;
+                    const endX = Math.cos(angle) * outerR;
+                    const endY = Math.sin(angle) * outerR;
+
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                }
+                ctx.strokeStyle = getThemeColor(0.5);
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            // ==========================================
+            // TEMA 10: BATANG KLASIK (BARS)
+            // ==========================================
+            else if (visualizerStyle === 'bars') {
+                const barWidth = (canvas.width / visualLength) - 2;
+                let x = 0;
+
+                for (let i = 0; i < visualLength; i++) {
+                    const barHeight = getAdaptiveBarHeight(i, dataArray[i]);
+
+                    const gradient = getThemeGradient(ctx, canvas.height);
+                    ctx.fillStyle = gradient;
+
+                    const yPos = canvas.height - barHeight;
+                    const radius = Math.min(barWidth / 2, 4);
+
+                    ctx.beginPath();
+                    ctx.moveTo(x, canvas.height);
+                    ctx.lineTo(x, yPos + radius);
+                    ctx.quadraticCurveTo(x, yPos, x + radius, yPos);
+                    ctx.lineTo(x + barWidth - radius, yPos);
+                    ctx.quadraticCurveTo(x + barWidth, yPos, x + barWidth, yPos + radius);
+                    ctx.lineTo(x + barWidth, canvas.height);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    x += barWidth + 2;
+                }
+            }
+        }
+
+        // --- SISTEM PEMUTAR AUDIO FILE ---
+        
+        // Handling File Upload
+        audioUpload.addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files.length === 0) return;
+
+            const file = files[0];
+            const fileUrl = URL.createObjectURL(file);
+            
+            setupAudioFile(fileUrl, file.name);
+        });
+
+        function setupAudioFile(url, fileName) {
+            stopMic();
+            initAudioEngine();
+
+            audioElement.src = url;
+            audioElement.load();
+            
+            if (source && isPlayingFile) {
+                try { source.disconnect(); } catch(e) {}
+            }
+
+            source = audioContext.createMediaElementSource(audioElement);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+
+            isPlayingFile = true;
+            isMicActive = false;
+
+            audioTrackName.textContent = fileName;
+            playerTrackName.textContent = fileName;
+
+            visualizerPlaceholder.classList.add('opacity-0', 'pointer-events-none');
+            audioPlayerContainer.classList.remove('hidden');
+            sourceIndicator.className = "w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping";
+            micBtn.className = "flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-850 text-sm font-semibold rounded-lg border border-gray-800 transition duration-200";
+            micText.textContent = "Aktifkan Mic";
+
+            audioElement.play().then(() => {
+                playIcon.className = "fa-solid fa-pause";
+                startVisualizerLoop();
+            }).catch(err => {
+                showCustomAlert("Gagal memutar audio secara otomatis. Silakan tekan tombol Putar/Play.");
+            });
+        }
+
+        // Play / Pause Klik Handler
+        playPauseBtn.addEventListener('click', function() {
+            if (!audioElement.src) return;
+
+            if (audioElement.paused) {
+                audioElement.play();
+                playIcon.className = "fa-solid fa-pause";
+            } else {
+                audioElement.pause();
+                playIcon.className = "fa-solid fa-play";
+            }
+        });
+
+        // Kontrol Volume
+        volumeSlider.addEventListener('input', function(e) {
+            const vol = e.target.value;
+            audioElement.volume = vol;
+            
+            const volIcon = document.getElementById('volumeIcon');
+            if (vol == 0) {
+                volIcon.className = "fa-solid fa-volume-mute text-xs text-red-400";
+            } else if (vol < 0.4) {
+                volIcon.className = "fa-solid fa-volume-low text-xs text-gray-400";
+            } else {
+                volIcon.className = "fa-solid fa-volume-high text-xs text-gray-400";
+            }
+        });
+
+        // Update Progress Bar Musik
+        audioElement.addEventListener('timeupdate', function() {
+            if (audioElement.duration) {
+                const percentage = (audioElement.currentTime / audioElement.duration) * 100;
+                progressBar.style.width = percentage + '%';
+                audioTimeDisplay.textContent = formatTime(audioElement.currentTime) + " / " + formatTime(audioElement.duration);
+            }
+        });
+
+        // Lompat ke bagian lagu (Seek)
+        progressBarContainer.addEventListener('click', function(e) {
+            if (!audioElement.duration) return;
+            const rect = progressBarContainer.getBoundingClientRect();
+            const clickPosition = (e.clientX - rect.left) / rect.width;
+            audioElement.currentTime = clickPosition * audioElement.duration;
+        });
+
+        function formatTime(seconds) {
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return min + ":" + (sec < 10 ? '0' : '') + sec;
+        }
+
+        audioElement.addEventListener('ended', function() {
+            playIcon.className = "fa-solid fa-play";
+            progressBar.style.width = '0%';
+        });
+
+        // --- SISTEM INPUT MIKROFON (REAL-TIME) ---
+        micBtn.addEventListener('click', function() {
+            if (isMicActive) {
+                stopMic();
+            } else {
+                startMic();
+            }
+        });
+
+        async function startMic() {
+            if (isPlayingFile) {
+                audioElement.pause();
+                playIcon.className = "fa-solid fa-play";
+            }
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                initAudioEngine();
+
+                if (source) {
+                    try { source.disconnect(); } catch(e) {}
+                }
+                
+                source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+
+                isMicActive = true;
+                isPlayingFile = false;
+
+                micBtn.className = "flex items-center gap-2 px-4 py-2 bg-red-650 hover:bg-red-650 active:bg-red-800 text-sm font-semibold rounded-lg shadow-md shadow-red-500/20 border border-transparent transition duration-200 text-white";
+                micIcon.className = "fa-solid fa-microphone-slash text-white";
+                micText.textContent = "Hentikan Mic";
+
+                audioTrackName.textContent = "Input Mikrofon Aktif";
+                sourceIndicator.className = "w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse";
+                visualizerPlaceholder.classList.add('opacity-0', 'pointer-events-none');
+                audioPlayerContainer.classList.add('hidden');
+
+                startVisualizerLoop();
+
+            } catch (err) {
+                console.error(err);
+                showCustomAlert("Gagal mengakses mikrofon Anda. Pastikan memberikan izin akses audio kepada peramban web.");
+                stopMic();
+            }
+        }
+
+        function stopMic() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            isMicActive = false;
+
+            micBtn.className = "flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-855 text-sm font-semibold rounded-lg border border-gray-800 transition duration-200";
+            micIcon.className = "fa-solid fa-microphone text-red-400";
+            micText.textContent = "Aktifkan Mic";
+
+            if (!isPlayingFile) {
+                sourceIndicator.className = "w-2.5 h-2.5 rounded-full bg-gray-600";
+                audioTrackName.textContent = "Tidak ada audio aktif";
+                visualizerPlaceholder.classList.remove('opacity-0', 'pointer-events-none');
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        // --- SISTEM LAYAR PENUH (FULLSCREEN API) ---
+        // Mendukung Desktop & Android dengan Penanganan Kebijakan Izin (Permission Policy Fallback)
+        function toggleFullscreen() {
+            const isNativeFSActive = document.fullscreenElement || 
+                                     document.webkitFullscreenElement || 
+                                     document.mozFullScreenElement || 
+                                     document.msFullscreenElement;
+
+            if (isNativeFSActive || isSimulatedFullscreen) {
+                // Keluar dari Mode Layar Penuh
+                if (isSimulatedFullscreen) {
+                    exitSimulatedFullscreen();
+                } else {
+                    try {
+                        if (document.exitFullscreen) {
+                            document.exitFullscreen();
+                        } else if (document.webkitExitFullscreen) {
+                            document.webkitExitFullscreen();
+                        } else if (document.mozCancelFullScreen) {
+                            document.mozCancelFullScreen();
+                        } else if (document.msExitFullscreen) {
+                            document.msExitFullscreen();
+                        }
+                    } catch (err) {
+                        // Jika keluar native gagal, pastikan simulated dilepas
+                        exitSimulatedFullscreen();
+                    }
+                }
+            } else {
+                // Masuk ke Mode Layar Penuh
+                try {
+                    let fullscreenPromise;
+                    if (visualizerCard.requestFullscreen) {
+                        fullscreenPromise = visualizerCard.requestFullscreen();
+                    } else if (visualizerCard.webkitRequestFullscreen) { /* Safari / Chrome mobile Android */
+                        fullscreenPromise = visualizerCard.webkitRequestFullscreen();
+                    } else if (visualizerCard.mozRequestFullScreen) { /* Firefox */
+                        fullscreenPromise = visualizerCard.mozRequestFullScreen();
+                    } else if (visualizerCard.msRequestFullscreen) { /* IE/Edge */
+                        fullscreenPromise = visualizerCard.msRequestFullscreen();
+                    }
+
+                    // Tangani jika browser menolak fullscreen asli (misal karena Permissions Policy di iframe)
+                    if (fullscreenPromise) {
+                        fullscreenPromise.catch(err => {
+                            console.warn("Layar penuh asli ditolak kebijakan izin. Beralih ke layar penuh buatan (Simulated FS).");
+                            enterSimulatedFullscreen();
+                        });
+                    }
+                } catch (err) {
+                    // Jika metode memicu error langsung (Permissions Policy / Sandbox), gunakan Simulated Fullscreen
+                    console.warn("Gagal mengeksekusi requestFullscreen asli. Menggunakan Simulated FS.");
+                    enterSimulatedFullscreen();
+                }
+            }
+        }
+
+        // Fungsi masuk ke mode simulated fullscreen menggunakan manipulasi CSS
+        function enterSimulatedFullscreen() {
+            isSimulatedFullscreen = true;
+            visualizerCard.classList.add('simulated-fullscreen');
+            handleFullscreenChangeEffects(true);
+        }
+
+        // Fungsi keluar dari simulated fullscreen
+        function exitSimulatedFullscreen() {
+            isSimulatedFullscreen = false;
+            visualizerCard.classList.remove('simulated-fullscreen');
+            handleFullscreenChangeEffects(false);
+        }
+
+        // Menangani pembaruan canvas dan perubahan ikon tombol fullscreen
+        function handleFullscreenChangeEffects(isFS) {
+            resizeCanvas();
+            if (isFS) {
+                fullscreenIcon.className = "fa-solid fa-compress text-xs text-cyan-400";
+                fullscreenBtn.title = "Keluar Layar Penuh";
+            } else {
+                fullscreenIcon.className = "fa-solid fa-expand text-xs text-gray-400 hover:text-cyan-400";
+                fullscreenBtn.title = "Layar Penuh";
+            }
+        }
+
+        // Bind Klik Event ke Tombol Fullscreen
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+        // Pantau perubahan status Fullscreen native (untuk sinkronisasi tombol escape browser)
+        const handleFullscreenChange = () => {
+            const isNativeFSActive = !!(document.fullscreenElement || 
+                                        document.webkitFullscreenElement || 
+                                        document.mozFullScreenElement || 
+                                        document.msFullscreenElement);
+
+            if (isNativeFSActive) {
+                isSimulatedFullscreen = false; // Jika native berhasil, nonaktifkan flag simulated
+                visualizerCard.classList.remove('simulated-fullscreen');
+                handleFullscreenChangeEffects(true);
+            } else if (!isSimulatedFullscreen) {
+                // Jika keluar dari native fullscreen dan simulated juga tidak aktif
+                handleFullscreenChangeEffects(false);
+            }
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+        // Pasang pendengar tombol ESCAPE keyboard jika menggunakan Simulated Fullscreen
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isSimulatedFullscreen) {
+                exitSimulatedFullscreen();
+            }
+        });
+
+
+        // --- MANAJEMEN PENYETELAN PANEL KONTROL ---
+
+        // Selector Tombol Gaya Visualizer
+        const styleButtons = document.querySelectorAll('.visualizer-style-btn');
+        styleButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                updateVisualizerStyle(this.getAttribute('data-style'));
+            });
+        });
+
+        function updateVisualizerStyle(style) {
+            visualizerStyle = style;
+            
+            // Perbarui tombol sidebar utama
+            styleButtons.forEach(b => {
+                if (b.getAttribute('data-style') === visualizerStyle) {
+                    b.classList.remove('bg-gray-900', 'hover:bg-gray-855', 'text-gray-400', 'border-gray-900');
+                    b.classList.add('bg-blue-600', 'hover:bg-blue-500', 'text-white', 'border-blue-500/30');
+                } else {
+                    b.classList.add('bg-gray-900', 'hover:bg-gray-855', 'text-gray-400', 'border-gray-900');
+                    b.classList.remove('bg-blue-600', 'hover:bg-blue-500', 'text-white', 'border-blue-500/30');
+                }
+            });
+
+            // Perbarui tombol panel ganti cepat
+            quickStyleButtons.forEach(b => {
+                if (b.getAttribute('data-style') === visualizerStyle) {
+                    b.classList.remove('bg-gray-900', 'hover:bg-gray-855', 'text-gray-300');
+                    b.classList.add('bg-blue-600/30', 'border', 'border-blue-500/30', 'text-white');
+                } else {
+                    b.classList.add('bg-gray-900', 'hover:bg-gray-855', 'text-gray-300');
+                    b.classList.remove('bg-blue-600/30', 'border', 'border-blue-500/30', 'text-white');
+                }
+            });
+
+            const labels = {
+                'tree': 'Tema: Pohon Kehidupan (Tumbuhan)',
+                'jellyfish': 'Tema: Ubur-Ubur Laut (Hewan)',
+                'human': 'Tema: Energi Pikiran (Manusia)',
+                'fire': 'Tema: Api Membakar (Elemen Api)',
+                'water': 'Tema: Riak Air Danau (Elemen Air)',
+                'wind': 'Tema: Aliran Angin (Elemen Angin)',
+                'earth': 'Tema: Tanah & Tektonik (Elemen Tanah)',
+                'soundwave': 'Tema: Garis Bunyi 3D',
+                'abstract': 'Tema: Simetri Sakral',
+                'bars': 'Tema: Batang Klasik'
+            };
+            visualizerTypeLabel.textContent = labels[visualizerStyle] || 'Tema: Pohon Kehidupan (Tumbuhan)';
+            
+            // Set ulang partikel agar sesuai tema terpilih
+            initParticles(visualizerStyle === 'fire' ? 100 : (visualizerStyle === 'earth' ? 80 : 40));
+        }
+
+        // Selector Tombol Tema Warna
+        const themeButtons = document.querySelectorAll('.theme-color-btn');
+        themeButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                updateThemeColor(this.getAttribute('data-theme'));
+            });
+        });
+
+        // Update skema warna cahaya visualisasi
+        function updateThemeColor(theme) {
+            themeColor = theme;
+            themeButtons.forEach(b => {
+                if (b.getAttribute('data-theme') === themeColor) {
+                    b.classList.remove('border-transparent');
+                    b.classList.add('border-white');
+                } else {
+                    b.classList.remove('border-white');
+                    b.classList.add('border-transparent');
+                }
+            });
+        }
+
+        // Pengaturan Sensitivitas Kerapatan (Density Slider)
+        densitySlider.addEventListener('input', function(e) {
+            updateDensity(parseInt(e.target.value));
+        });
+
+        function updateDensity(index) {
+            densityValue = DENSITY_PRESETS[index];
+            densitySlider.value = index;
+            densityVal.textContent = densityValue;
+            
+            if (analyser) {
+                // analyser.fftSize dijamin selalu pangkat 2 berkat preset DENSITY_PRESETS!
+                analyser.fftSize = densityValue * 4;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+            }
+        }
+
+        // Pengaturan Sensitivitas Dinamika (Auto-Gain Strength)
+        dynamicSlider.addEventListener('input', function(e) {
+            updateDynamicStrength(parseFloat(e.target.value));
+        });
+
+        // Pengaturan Kekuatan Dinamika (Auto-Gain)
+        function updateDynamicStrength(val) {
+            dynamicStrength = val;
+            dynamicSlider.value = val;
+            dynamicVal.textContent = Math.round(dynamicStrength * 100) + "%";
+        }
+
+        // Pengaturan Sensitivitas Nada Rendah (Bass Equalizer Boost)
+        bassSlider.addEventListener('input', function(e) {
+            updateBassBoost(parseFloat(e.target.value));
+        });
+
+        function updateBassBoost(val) {
+            bassBoost = val;
+            bassSlider.value = val;
+            bassVal.textContent = bassBoost.toFixed(1) + "x";
+        }
+
+        // Pengaturan Sensitivitas Nada Tinggi (Treble Equalizer Boost)
+        pitchSlider.addEventListener('input', function(e) {
+            updatePitchBoost(parseFloat(e.target.value));
+        });
+
+        function updatePitchBoost(val) {
+            pitchBoost = val;
+            pitchSlider.value = val;
+            pitchVal.textContent = pitchBoost.toFixed(1) + "x";
+        }
+
+
+        // --- MANAJEMER PRESET (LOGIKA UTAMA) ---
+        // Render daftar preset ke HTML
+        function renderPresets() {
+            presetList.innerHTML = '';
+            presets.forEach(preset => {
+                const item = document.createElement('div');
+                item.className = "flex items-center justify-between p-2 bg-gray-900/50 hover:bg-gray-900/90 border border-gray-900 rounded-xl transition duration-150 group";
+                
+                // Konten nama & detail singkat
+                const leftArea = document.createElement('button');
+                leftArea.className = "flex-grow flex flex-col items-start text-left pr-2";
+                leftArea.addEventListener('click', () => applyPreset(preset));
+
+                const name = document.createElement('span');
+                name.className = "text-xs font-semibold text-gray-200 group-hover:text-blue-400 transition";
+                name.textContent = preset.name;
+
+                const detail = document.createElement('span');
+                detail.className = "text-[9px] text-gray-500 uppercase tracking-wider mt-0.5";
+                detail.textContent = `${preset.style} • ${preset.theme.replace('-', ' ')}`;
+
+                leftArea.appendChild(name);
+                leftArea.appendChild(detail);
+                item.appendChild(leftArea);
+
+                // Tombol Hapus (hanya untuk preset kustom buatan pengguna)
+                if (!preset.isDefault) {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = "w-6 h-6 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition";
+                    deleteBtn.innerHTML = `<i class="fa-solid fa-trash-can text-[10px]"></i>`;
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        // Pembaruan: Panggil modal konfirmasi kustom baru untuk menghapus preset
+                        openDeletePresetModal(preset.id);
+                    });
+                    item.appendChild(deleteBtn);
+                } else {
+                    // Penanda ikon gembok kecil untuk default preset
+                    const lockIcon = document.createElement('span');
+                    lockIcon.className = "text-[9px] text-gray-600 px-1.5 py-0.5 bg-gray-950/40 rounded-md";
+                    lockIcon.textContent = "Sistem";
+                    item.appendChild(lockIcon);
+                }
+
+                presetList.appendChild(item);
+            });
+        }
+
+        // Menerapkan konfigurasi preset terpilih
+        function applyPreset(preset) {
+            updateVisualizerStyle(preset.style);
+            updateThemeColor(preset.theme);
+            updateDensity(preset.densityIdx);
+            updateDynamicStrength(preset.dynamic);
+            updateBassBoost(preset.bass);
+            updatePitchBoost(preset.pitch);
+
+            showCustomAlert(`Preset "${preset.name}" berhasil diterapkan!`);
+        }
+
+        // Membuka modal Simpan Preset Baru
+        openSavePresetBtn.addEventListener('click', () => {
+            presetNameInput.value = '';
+            presetModal.classList.remove('opacity-0', 'pointer-events-none');
+            presetModalContent.classList.remove('scale-95');
+            presetModalContent.classList.add('scale-100');
+            presetNameInput.focus();
+        });
+
+        // Menutup modal Simpan Preset
+        cancelPresetBtn.addEventListener('click', closePresetModal);
+        
+        function closePresetModal() {
+            presetModal.classList.add('opacity-0', 'pointer-events-none');
+            presetModalContent.classList.remove('scale-100');
+            presetModalContent.classList.add('scale-95');
+        }
+
+        // Menyimpan Preset Baru dari status slider saat ini
+        confirmSavePresetBtn.addEventListener('click', () => {
+            const name = presetNameInput.value.trim();
+            if (!name) {
+                showCustomAlert("Silakan masukkan nama preset terlebih dahulu.");
+                return;
+            }
+
+            // Temukan indeks kerapatan saat ini dari array DENSITY_PRESETS
+            const currentDensityIdx = DENSITY_PRESETS.indexOf(densityValue);
+
+            const newPreset = {
+                id: 'custom-' + Date.now(),
+                name: '💾 ' + name,
+                style: visualizerStyle,
+                theme: themeColor,
+                densityIdx: currentDensityIdx !== -1 ? currentDensityIdx : 1,
+                dynamic: dynamicStrength,
+                bass: bassBoost,
+                pitch: pitchBoost,
+                isDefault: false
+            };
+
+            presets.push(newPreset);
+            renderPresets();
+            closePresetModal();
+            showCustomAlert(`Preset "${name}" berhasil disimpan!`);
+        });
+
+        // --- SISTEM HAPUS PRESET KUSTOM MODAL BARU ---
+        function openDeletePresetModal(id) {
+            presetIdToDelete = id;
+            deletePresetModal.classList.remove('opacity-0', 'pointer-events-none');
+            deletePresetModalContent.classList.remove('scale-95');
+            deletePresetModalContent.classList.add('scale-100');
+        }
+
+        // Tutup modal konfirmasi hapus preset kustom
+        function closeDeletePresetModal() {
+            presetIdToDelete = null;
+            deletePresetModal.classList.add('opacity-0', 'pointer-events-none');
+            deletePresetModalContent.classList.remove('scale-100');
+            deletePresetModalContent.classList.add('scale-95');
+        }
+
+        cancelDeletePresetBtn.addEventListener('click', closeDeletePresetModal);
+
+        confirmDeletePresetBtn.addEventListener('click', () => {
+            if (presetIdToDelete) {
+                const targetPreset = presets.find(p => p.id === presetIdToDelete);
+                const presetName = targetPreset ? targetPreset.name : "";
+                presets = presets.filter(p => p.id !== presetIdToDelete);
+                renderPresets();
+                showCustomAlert(`Preset ${presetName} berhasil dihapus.`);
+            }
+            closeDeletePresetModal();
+        });
+
+        // --- KONTROL INTEGRASI QUICK THEME SWITCHER (GANTI TEMA CEPAT) ---
+        // Toggle panel mengambang
+        quickThemeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            quickThemePanel.classList.toggle('hidden');
+        });
+
+        // Tutup panel jika klik di luar area
+        document.addEventListener('click', (e) => {
+            if (!quickThemePanel.contains(e.target) && e.target !== quickThemeBtn) {
+                quickThemePanel.classList.add('hidden');
+            }
+        });
+
+        // Sambungkan klik ganti tema cepat pada list tombol
+        quickStyleButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                updateVisualizerStyle(this.getAttribute('data-style'));
+                quickThemePanel.classList.add('hidden'); // Tutup panel setelah memilih
+            });
+        });
+
+        // --- SISTEM NAVIGASI GANTI TEMA & WARNA SENSORIS (ARAH TOMBOL & SWIPE) ---
+        // Fungsi pembantu untuk menggeser tema visual (gaya gambar)
+        function changeStyleOffset(offset) {
+            let currentIndex = STYLES_ARRAY.indexOf(visualizerStyle);
+            if (currentIndex === -1) currentIndex = 0;
+            let nextIndex = (currentIndex + offset + STYLES_ARRAY.length) % STYLES_ARRAY.length;
+            updateVisualizerStyle(STYLES_ARRAY[nextIndex]);
+            showCustomAlert(`Beralih ke Tema: ${visualizerTypeLabel.textContent.replace('Tema: ', '')}`);
+        }
+
+        // Fungsi pembantu untuk menggeser warna cahaya aktif (skema warna)
+        function changeThemeOffset(offset) {
+            let currentIndex = THEMES_ARRAY.indexOf(themeColor);
+            if (currentIndex === -1) currentIndex = 0;
+            let nextIndex = (currentIndex + offset + THEMES_ARRAY.length) % THEMES_ARRAY.length;
+            updateThemeColor(THEMES_ARRAY[nextIndex]);
+            
+            // Map themeColor ke nama representasi yang cantik
+            const themeNames = {
+                'neon-blue': 'Aurora Cyan',
+                'cyberpunk': 'Cyberpunk Orchid',
+                'nature-green': 'Forest Light',
+                'fire': 'Sunset Glow',
+                'retro-gold': 'Retro Gold',
+                'cosmic-nebula': 'Cosmic Nebula',
+                'monochrome-ice': 'Monochrome Ice',
+                'acid-lemon': 'Acid Lemon'
+            };
+            showCustomAlert(`Skema Warna: ${themeNames[themeColor] || themeColor}`);
+        }
+
+        // 1. Keyboard Navigasi Tombol Arah (Hanya Aktif saat Fullscreen)
+        window.addEventListener('keydown', (e) => {
+            const isFS = !!(document.fullscreenElement || 
+                           document.webkitFullscreenElement || 
+                           document.mozFullScreenElement || 
+                           document.msFullscreenElement ||
+                           isSimulatedFullscreen);
+
+            if (isFS) {
+                if (e.key === 'ArrowRight') {
+                    changeStyleOffset(1); // Geser tema selanjutnya (Horizontal)
+                } else if (e.key === 'ArrowLeft') {
+                    changeStyleOffset(-1); // Geser tema sebelumnya (Horizontal)
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault(); // Mencegah scrolling browser default
+                    changeThemeOffset(1); // Geser warna skema selanjutnya (Vertikal)
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault(); // Mencegah scrolling browser default
+                    changeThemeOffset(-1); // Geser warna skema sebelumnya (Vertikal)
+                }
+            }
+        });
+
+        // 2. Touch/Geser (Swipe) Gestur Deteksi khusus untuk Android/Tablet
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+
+        visualizerCard.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        visualizerCard.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            handleSwipeGesture();
+        }, { passive: true });
+
+        function handleSwipeGesture() {
+            const isFS = !!(document.fullscreenElement || 
+                           document.webkitFullscreenElement || 
+                           document.mozFullScreenElement || 
+                           document.msFullscreenElement ||
+                           isSimulatedFullscreen);
+
+            // Hanya aktifkan gestur geser jika dalam mode Fullscreen untuk menghindari bentrok scroll biasa
+            if (isFS) {
+                const swipeThreshold = 55; // Jarak minimal usap dalam pixel
+                const deltaX = touchEndX - touchStartX;
+                const deltaY = touchEndY - touchStartY;
+
+                // Tentukan arah usapan dominan (Horizontal vs Vertikal)
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    // Geser Horizontal (Gaya Spektrum)
+                    if (Math.abs(deltaX) > swipeThreshold) {
+                        if (deltaX < 0) {
+                            changeStyleOffset(1); // Usap ke Kiri -> Tema Berikutnya
+                        } else {
+                            changeStyleOffset(-1); // Usap ke Kanan -> Tema Sebelumnya
+                        }
+                    }
+                } else {
+                    // Geser Vertikal (Skema Warna)
+                    if (Math.abs(deltaY) > swipeThreshold) {
+                        if (deltaY < 0) {
+                            changeThemeOffset(1); // Usap ke Atas -> Warna Berikutnya
+                        } else {
+                            changeThemeOffset(-1); // Usap ke Bawah -> Warna Sebelumnya
+                        }
+                    }
+                }
+            }
+        }
+
+        // Render preset saat pertama kali dimuat
+        renderPresets();
+
+
+        // --- SISTEM RESET PROYEK (MULAI BARU) ---
+        // Menampilkan Modal Konfirmasi
+        resetBtn.addEventListener('click', () => {
+            confirmModal.classList.remove('opacity-0', 'pointer-events-none');
+            confirmModalContent.classList.remove('scale-95');
+            confirmModalContent.classList.add('scale-100');
+        });
+
+        // Menutup Modal (Batal)
+        cancelResetBtn.addEventListener('click', closeResetModal);
+        
+        function closeResetModal() {
+            confirmModal.classList.add('opacity-0', 'pointer-events-none');
+            confirmModalContent.classList.remove('scale-100');
+            confirmModalContent.classList.add('scale-95');
+        }
+
+        // Konfirmasi Reset (Mulai Ulang Proyek)
+        confirmResetBtn.addEventListener('click', () => {
+            resetAppToDefault();
+            closeResetModal();
+            showCustomAlert("Proyek berhasil disetel ulang ke pengaturan awal.");
+        });
+
+        // Fungsi membersihkan dan menyetel ulang semua state ke default
+        function resetAppToDefault() {
+            // 1. Matikan Mikrofon
+            stopMic();
+
+            // 2. Hentikan pemutaran lagu
+            audioElement.pause();
+            audioElement.src = "";
+            isPlayingFile = false;
+
+            // 3. Putuskan sambungan audio source
+            if (source) {
+                try { source.disconnect(); } catch(e) {}
+                source = null;
+            }
+
+            // 4. Kembalikan variabel state ke setelan pabrik
+            densityValue = 64;
+            dynamicStrength = 1.0;
+            bassBoost = 1.2;
+            pitchBoost = 1.2;
+            rollingAverageVolume = 40;
+            themeColor = 'neon-blue';
+            visualizerStyle = 'tree';
+
+            // 5. Kembalikan posisi slider ke nilai default di HTML
+            densitySlider.value = 1;
+            densityVal.textContent = densityValue;
+
+            dynamicSlider.value = 1;
+            dynamicVal.textContent = "100%";
+
+            bassSlider.value = 1.2;
+            bassVal.textContent = "1.2x";
+
+            pitchSlider.value = 1.2;
+            pitchVal.textContent = "1.2x";
+
+            volumeSlider.value = 0.7;
+            audioElement.volume = 0.7;
+            document.getElementById('volumeIcon').className = "fa-solid fa-volume-high text-xs text-gray-400";
+
+            // 6. Reset UI Tombol Tema Warna & Tema Visualizer
+            updateThemeColor('neon-blue');
+            updateVisualizerStyle('tree');
+
+            // 7. Re-inisialisasi Analyser Spektrum
+            if (analyser) {
+                analyser.fftSize = densityValue * 4;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+            }
+
+            // 8. Reset UI Container visualizer
+            visualizerPlaceholder.classList.remove('opacity-0', 'pointer-events-none');
+            audioPlayerContainer.classList.add('hidden');
+            audioTrackName.textContent = "Tidak ada audio aktif";
+            sourceIndicator.className = "w-2.5 h-2.5 rounded-full bg-gray-600";
+            progressBar.style.width = '0%';
+
+            // 9. Inisialisasi ulang partikel
+            initParticles(40);
+
+            // 10. Hentikan loop gambar & bersihkan kanvas
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+    </script>
+</body>
+</html>
